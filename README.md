@@ -234,6 +234,154 @@ python -m pytest tests/ -v       # 101개 테스트
 | 관세법 시행령 | 제102조 | 직매된 전시용품의 통관전 반출금지 |
 | 관세청 고시 | 제2026-15호 | 보세전시장 운영에 관한 고시 |
 
+## 운영자 가이드: 내 사이트에 챗봇 적용하기
+
+### 방법 1. 독립 서버로 운영 (가장 간단)
+
+서버 1대에 Flask를 띄우고, 기존 사이트에서 iframe이나 링크로 연결합니다.
+
+```bash
+# 1. 서버에 코드 배포
+git clone https://github.com/sun475300-sudo/bonded-exhibition-chatbot-data.git
+cd bonded-exhibition-chatbot-data
+pip install -r requirements.txt
+
+# 2. 서버 실행 (백그라운드)
+nohup python web_server.py --port 8080 --host 0.0.0.0 &
+
+# 3. 프로덕션 배포 시 gunicorn 사용 권장
+pip install gunicorn
+gunicorn -w 4 -b 0.0.0.0:8080 web_server:app
+```
+
+기존 사이트 HTML에 iframe 삽입:
+```html
+<iframe src="http://챗봇서버주소:8080"
+        width="400" height="600"
+        style="border:none; border-radius:12px; box-shadow:0 4px 24px rgba(0,0,0,0.15);">
+</iframe>
+```
+
+### 방법 2. 팝업 위젯으로 기존 사이트에 삽입
+
+기존 웹사이트의 `</body>` 바로 위에 아래 코드를 붙여넣으면 우측 하단에 챗봇 버튼이 생깁니다.
+
+```html
+<!-- 보세전시장 챗봇 위젯 -->
+<div id="chatbot-widget" style="position:fixed;bottom:24px;right:24px;z-index:9999;">
+  <iframe id="chatbot-frame" src="http://챗봇서버주소:8080"
+          style="display:none;width:400px;height:600px;border:none;border-radius:12px;
+                 box-shadow:0 8px 32px rgba(0,0,0,0.3);"></iframe>
+  <button onclick="
+    var f=document.getElementById('chatbot-frame');
+    f.style.display=f.style.display==='none'?'block':'none';
+  " style="width:60px;height:60px;border-radius:50%;border:none;
+           background:linear-gradient(135deg,#1565C0,#1E88E5);color:#fff;
+           font-size:24px;cursor:pointer;box-shadow:0 4px 16px rgba(21,101,192,0.4);">
+    B
+  </button>
+</div>
+```
+
+### 방법 3. API만 사용 (자체 UI 구축)
+
+챗봇 서버의 REST API만 호출하여 자체 UI에서 사용합니다.
+
+```
+POST /api/chat
+Content-Type: application/json
+
+요청: {"query": "보세전시장이 무엇인가요?"}
+
+응답: {
+  "answer": "문의하신 내용은 [제도 일반]에 관한...",
+  "category": "GENERAL",
+  "categories": ["GENERAL"],
+  "is_escalation": false,
+  "escalation_target": null
+}
+```
+
+API 엔드포인트 목록:
+
+| 엔드포인트 | 메서드 | 설명 |
+|-----------|--------|------|
+| `/api/chat` | POST | 질문 처리 및 답변 반환 |
+| `/api/faq` | GET | FAQ 29개 목록 반환 |
+| `/api/config` | GET | 챗봇 설정 (카테고리, 연락처) |
+| `/api/health` | GET | 서버 상태 확인 |
+
+JavaScript 호출 예시:
+```javascript
+async function askChatbot(question) {
+  const res = await fetch('http://챗봇서버주소:8080/api/chat', {
+    method: 'POST',
+    headers: {'Content-Type': 'application/json'},
+    body: JSON.stringify({query: question})
+  });
+  const data = await res.json();
+  console.log(data.answer);      // 답변 텍스트
+  console.log(data.category);    // 분류 카테고리
+  console.log(data.is_escalation); // 에스컬레이션 여부
+}
+```
+
+### 방법 4. 카카오톡/슬랙 연동
+
+카카오톡 챗봇이나 슬랙 봇에서 `/api/chat` API를 호출하면 동일한 답변을 받을 수 있습니다.
+
+```
+카카오톡 스킬서버 / 슬랙 Webhook
+         |
+    POST /api/chat  ──>  챗봇 서버  ──>  JSON 응답
+         |
+    응답을 카카오/슬랙 형식으로 변환하여 반환
+```
+
+### FAQ/법령 데이터 수정 방법
+
+운영 중 FAQ를 추가하거나 법령이 개정되면:
+
+```
+1. data/faq.json          ← FAQ 추가/수정
+2. data/legal_references.json  ← 법령 근거 업데이트
+3. data/escalation_rules.json  ← 에스컬레이션 규칙 변경
+4. src/classifier.py      ← 분류 키워드 조정 (필요 시)
+```
+
+FAQ 항목 추가 형식:
+```json
+{
+  "id": "NEW01",
+  "category": "GENERAL",
+  "question": "새로운 질문?",
+  "answer": "답변 내용...",
+  "legal_basis": ["관세법 제○조"],
+  "notes": "",
+  "keywords": ["키워드1", "키워드2", "키워드3"]
+}
+```
+
+수정 후 검증:
+```bash
+python -m pytest tests/ -v          # 기존 테스트 통과 확인
+python simulator.py --test          # 시나리오 테스트
+python -c "from src.data_validator import run_all_validations; print(run_all_validations())"  # 정합성 검증
+```
+
+### 운영 시 주의사항
+
+| 항목 | 내용 |
+|------|------|
+| 법령 업데이트 | 관세청 고시 개정 시 `data/` 내 JSON 파일 갱신 필요 |
+| 면책 문구 | 모든 답변에 자동 포함됨, 제거 금지 |
+| 에스컬레이션 | 5개 규칙에 해당하면 사람 상담 연결 안내 자동 출력 |
+| CORS 설정 | 다른 도메인에서 API 호출 시 Flask-CORS 설치 필요 |
+| HTTPS | 프로덕션 배포 시 nginx + SSL 인증서 적용 권장 |
+| 로깅 | 민원 분석을 위해 질문/답변 로그 저장 기능 별도 구축 권장 |
+
+---
+
 ## 업데이트 내역
 
 | 커밋 | 내용 |
