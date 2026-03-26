@@ -27,7 +27,7 @@ def check_escalation(query: str) -> dict | None:
     matched_rules = []
     for rule in rules:
         keywords = rule.get("keywords", [])
-        match_count = sum(1 for kw in keywords if kw in query_lower)
+        match_count = sum(1 for kw in keywords if kw.lower() in query_lower)
         if match_count > 0:
             matched_rules.append((match_count, rule))
 

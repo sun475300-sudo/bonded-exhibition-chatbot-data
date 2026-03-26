@@ -57,7 +57,8 @@ class BondedExhibitionChatbot:
                 best_match = item
                 best_keyword_hits = keyword_hits
 
-        if best_score >= 1:
+        # 키워드 매칭이 최소 1개 이상이어야 유효한 FAQ 매칭으로 간주
+        if best_score >= 1 and best_keyword_hits >= 1:
             return best_match
         return None
 
