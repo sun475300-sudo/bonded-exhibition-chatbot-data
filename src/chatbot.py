@@ -3,11 +3,15 @@
 사용자 질문 → 분류 → FAQ 매칭 → 에스컬레이션 확인 → 답변 생성
 """
 
-from src.classifier import classify_query, get_primary_category
+from src.classifier import classify_query
 from src.escalation import check_escalation, get_escalation_contact
 from src.response_builder import build_response, build_unknown_response
-from src.validator import get_needed_confirmations, format_confirmation_section
+from src.validator import get_needed_confirmations
 from src.utils import load_json, load_text, normalize_query
+
+# 카테고리 보너스 및 매칭 임계값 설정
+CATEGORY_BONUS = 2
+MIN_KEYWORD_HITS = 1
 
 
 class BondedExhibitionChatbot:
@@ -24,15 +28,7 @@ class BondedExhibitionChatbot:
         return self.config.get("persona", "")
 
     def find_matching_faq(self, query: str, category: str) -> dict | None:
-        """질문과 카테고리에 매칭되는 FAQ 항목을 찾는다.
-
-        Args:
-            query: 사용자 질문
-            category: 분류된 카테고리
-
-        Returns:
-            매칭된 FAQ dict 또는 None
-        """
+        """질문과 카테고리에 매칭되는 FAQ 항목을 찾는다."""
         query_lower = normalize_query(query)
         best_match = None
         best_score = 0
@@ -43,7 +39,7 @@ class BondedExhibitionChatbot:
             keyword_hits = 0
 
             if item.get("category") == category:
-                score += 2
+                score += CATEGORY_BONUS
 
             keywords = item.get("keywords", [])
             for kw in keywords:
@@ -51,60 +47,40 @@ class BondedExhibitionChatbot:
                     score += 1
                     keyword_hits += 1
 
-            # 동점일 때 키워드 매칭 수가 더 많은 항목을 우선 선택
             if score > best_score or (score == best_score and keyword_hits > best_keyword_hits):
                 best_score = score
                 best_match = item
                 best_keyword_hits = keyword_hits
 
-        # 키워드 매칭이 최소 1개 이상이어야 유효한 FAQ 매칭으로 간주
-        if best_score >= 1 and best_keyword_hits >= 1:
+        if best_score >= 1 and best_keyword_hits >= MIN_KEYWORD_HITS:
             return best_match
         return None
 
+    def _extract_conclusion(self, answer: str) -> str:
+        """FAQ 답변에서 의미 있는 결론을 추출한다."""
+        sentences = answer.replace("·", ",").split(".")
+        # 첫 문장이 너무 짧으면 (3글자 이하, 예: "네") 두 번째 문장까지 포함
+        first = sentences[0].strip()
+        if len(first) <= 3 and len(sentences) > 1:
+            return (first + ". " + sentences[1].strip()).strip() + "."
+        return first + "."
+
     def process_query(self, query: str) -> str:
-        """사용자 질문을 처리하여 답변을 생성한다.
-
-        Args:
-            query: 사용자 질문 문자열
-
-        Returns:
-            포맷된 답변 문자열
-        """
+        """사용자 질문을 처리하여 답변을 생성한다."""
         if not query or not query.strip():
             return "질문을 입력해 주세요."
 
         categories = classify_query(query)
+        if not categories:
+            categories = ["GENERAL"]
         primary_category = categories[0]
 
         escalation = check_escalation(query)
-
         faq_match = self.find_matching_faq(query, primary_category)
 
-        # 에스컬레이션 전용 질문 판단: FAQ 매칭이 있더라도 에스컬레이션이
-        # 트리거되고, FAQ 매칭이 카테고리 보너스만으로 잡힌 약한 매칭이면
-        # 에스컬레이션을 우선한다.
-        escalation_only = False
-        if escalation and faq_match:
-            faq_keywords = faq_match.get("keywords", [])
-            query_lower = normalize_query(query)
-            keyword_hits = sum(1 for kw in faq_keywords if kw in query_lower)
-            if keyword_hits == 0:
-                escalation_only = True
-
-        if escalation and (not faq_match or escalation_only):
-            contact = get_escalation_contact(escalation)
-            contact_name = contact.get("name", "관세청 고객지원센터")
-            contact_phone = contact.get("phone", "")
-            phone_info = f"({contact_phone})" if contact_phone else ""
-
-            return (
-                f"{escalation['message']}\n\n"
-                f"문의처: {contact_name} {phone_info}\n\n"
-                "안내:\n"
-                "- 본 답변은 일반적인 안내용 설명이며, 구체적인 사실관계에 따라 달라질 수 있습니다.\n"
-                "- 최종 처리는 관할 세관 또는 해당 소관기관 확인이 필요합니다."
-            )
+        # 에스컬레이션 우선: FAQ 매칭이 없거나 에스컬레이션만 트리거된 경우
+        if escalation and not faq_match:
+            return self._build_escalation_response(escalation)
 
         if faq_match:
             confirmations = get_needed_confirmations(primary_category, query)
@@ -114,8 +90,8 @@ class BondedExhibitionChatbot:
 
             response = build_response(
                 topic=category_name,
-                conclusion=faq_match["answer"].split(".")[0] + ".",
-                explanation=[faq_match["answer"]],
+                conclusion=self._extract_conclusion(faq_match.get("answer", "")),
+                explanation=[faq_match.get("answer", "")],
                 legal_basis=faq_match.get("legal_basis", []),
                 confirmation_items=confirmation_texts if confirmation_texts else None,
                 is_escalation=escalation is not None,
@@ -123,7 +99,22 @@ class BondedExhibitionChatbot:
             )
             return response
 
-        return build_unknown_response(query)
+        return build_unknown_response()
+
+    def _build_escalation_response(self, escalation: dict) -> str:
+        """에스컬레이션 전용 응답을 생성한다."""
+        contact = get_escalation_contact(escalation)
+        contact_name = contact.get("name", "관세청 고객지원센터")
+        contact_phone = contact.get("phone", "")
+        phone_info = f"({contact_phone})" if contact_phone else ""
+
+        return (
+            f"{escalation.get('message', '')}\n\n"
+            f"문의처: {contact_name} {phone_info}\n\n"
+            "안내:\n"
+            "- 본 답변은 일반적인 안내용 설명이며, 구체적인 사실관계에 따라 달라질 수 있습니다.\n"
+            "- 최종 처리는 관할 세관 또는 해당 소관기관 확인이 필요합니다."
+        )
 
     def _get_category_name(self, category_code: str) -> str:
         """카테고리 코드를 한글 이름으로 변환한다."""

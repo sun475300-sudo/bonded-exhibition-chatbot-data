@@ -3,8 +3,6 @@
 민원 정확도를 높이기 위해 사용자에게 추가 확인이 필요한 항목을 관리한다.
 """
 
-from src.utils import load_json
-
 CONFIRMATION_QUESTIONS = {
     "foreign_goods": {
         "question": "해당 물품은 외국물품인가요?",
@@ -34,23 +32,20 @@ CONFIRMATION_QUESTIONS = {
 
 
 def get_needed_confirmations(category: str, query: str) -> list[dict]:
-    """카테고리와 질문 내용에 따라 필요한 확인 질문 목록을 반환한다.
-
-    Args:
-        category: 분류된 카테고리 코드
-        query: 사용자 질문 문자열
-
-    Returns:
-        확인이 필요한 질문 목록
-    """
+    """카테고리와 질문 내용에 따라 필요한 확인 질문 목록을 반환한다."""
     needed = []
-    query_lower = query.lower()
+    seen_keys = set()
+    query_lower = query.lower() if query else ""
 
-    always_needed = ["foreign_goods"]
-    for key in always_needed:
-        if key in CONFIRMATION_QUESTIONS:
+    def _add(key: str):
+        if key not in seen_keys and key in CONFIRMATION_QUESTIONS:
             needed.append(CONFIRMATION_QUESTIONS[key])
+            seen_keys.add(key)
 
+    # 항상 물어보는 질문
+    _add("foreign_goods")
+
+    # 카테고리별 추가 질문
     category_questions = {
         "SALES": ["purpose", "post_event_plan"],
         "SAMPLE": ["purpose", "post_event_plan"],
@@ -58,28 +53,16 @@ def get_needed_confirmations(category: str, query: str) -> list[dict]:
         "IMPORT_EXPORT": ["post_event_plan", "venue_licensed"],
         "LICENSE": ["venue_licensed"],
         "EXHIBITION": ["purpose", "venue_licensed"],
+        "PENALTIES": ["customs_consulted"],
+        "DOCUMENTS": ["venue_licensed"],
     }
 
-    extra_keys = category_questions.get(category, [])
-    for key in extra_keys:
-        q = CONFIRMATION_QUESTIONS.get(key)
-        if q and q not in needed:
-            needed.append(q)
+    for key in category_questions.get(category, []):
+        _add(key)
 
-    if any(kw in query_lower for kw in ["식품", "시식", "음식", "검역"]):
-        q = CONFIRMATION_QUESTIONS.get("other_requirements")
-        if q and q not in needed:
-            needed.append(q)
+    # 키워드 기반 추가
+    food_keywords = ["식품", "시식", "음식", "검역", "의료기기", "식약처"]
+    if any(kw in query_lower for kw in food_keywords):
+        _add("other_requirements")
 
     return needed
-
-
-def format_confirmation_section(confirmations: list[dict]) -> str:
-    """확인 질문 목록을 답변용 텍스트로 포맷한다."""
-    if not confirmations:
-        return ""
-
-    lines = ["민원인이 확인할 사항:"]
-    for item in confirmations:
-        lines.append(f"- {item['question']}")
-    return "\n".join(lines)

@@ -8,7 +8,7 @@ Flask 기반 REST API + 웹 UI를 제공한다.
 """
 
 import argparse
-import json
+import logging
 import os
 import sys
 
@@ -19,48 +19,70 @@ from src.chatbot import BondedExhibitionChatbot
 from src.classifier import classify_query
 from src.escalation import check_escalation
 
-app = Flask(__name__, static_folder="web", static_url_path="/static")
+BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+MAX_QUERY_LENGTH = 2000
+
+app = Flask(__name__, static_folder=os.path.join(BASE_DIR, "web"), static_url_path="/static")
+
+logging.basicConfig(
+    level=logging.INFO,
+    format="%(asctime)s [%(levelname)s] %(message)s",
+    datefmt="%Y-%m-%d %H:%M:%S",
+)
+logger = logging.getLogger("chatbot")
 
 chatbot = BondedExhibitionChatbot()
+
+
+@app.errorhandler(400)
+def bad_request(e):
+    return jsonify({"error": "잘못된 요청입니다."}), 400
+
+
+@app.errorhandler(404)
+def not_found(e):
+    return jsonify({"error": "요청한 리소스를 찾을 수 없습니다."}), 404
+
+
+@app.errorhandler(500)
+def internal_error(e):
+    logger.error(f"내부 서버 오류: {e}")
+    return jsonify({"error": "내부 서버 오류가 발생했습니다."}), 500
 
 
 @app.route("/")
 def index():
     """웹 챗봇 UI 페이지를 반환한다."""
-    return send_from_directory("web", "index.html")
+    return send_from_directory(os.path.join(BASE_DIR, "web"), "index.html")
 
 
 @app.route("/api/chat", methods=["POST"])
 def chat():
-    """사용자 질문을 처리하여 답변을 반환한다.
-
-    Request JSON:
-        {"query": "질문 문자열"}
-
-    Response JSON:
-        {
-            "answer": "답변 문자열",
-            "category": "분류된 카테고리",
-            "categories": ["매칭된 카테고리 목록"],
-            "is_escalation": bool,
-            "escalation_target": "에스컬레이션 대상" or null
-        }
-    """
-    data = request.get_json()
+    """사용자 질문을 처리하여 답변을 반환한다."""
+    data = request.get_json(silent=True)
     if not data or "query" not in data:
         return jsonify({"error": "query 필드가 필요합니다."}), 400
 
-    query = data["query"].strip()
+    raw_query = data["query"]
+    if not isinstance(raw_query, str):
+        return jsonify({"error": "query는 문자열이어야 합니다."}), 400
+
+    query = raw_query.strip()
     if not query:
         return jsonify({"error": "질문을 입력해 주세요."}), 400
+
+    if len(query) > MAX_QUERY_LENGTH:
+        return jsonify({"error": f"질문은 {MAX_QUERY_LENGTH}자 이내로 입력해 주세요."}), 400
 
     categories = classify_query(query)
     escalation = check_escalation(query)
     answer = chatbot.process_query(query)
 
+    logger.info(f"질문: {query[:50]}... | 분류: {categories[0]} | 에스컬레이션: {escalation is not None}")
+
     response = {
         "answer": answer,
-        "category": categories[0],
+        "category": categories[0] if categories else "GENERAL",
         "categories": categories,
         "is_escalation": escalation is not None,
         "escalation_target": escalation.get("target") if escalation else None,
@@ -75,9 +97,9 @@ def faq_list():
     items = []
     for item in chatbot.faq_items:
         items.append({
-            "id": item["id"],
-            "category": item["category"],
-            "question": item["question"],
+            "id": item.get("id", ""),
+            "category": item.get("category", ""),
+            "question": item.get("question", ""),
         })
     return jsonify({"items": items, "count": len(items)})
 
@@ -102,11 +124,10 @@ def main():
     parser = argparse.ArgumentParser(description="보세전시장 챗봇 웹 서버")
     parser.add_argument("--port", type=int, default=5000)
     parser.add_argument("--host", type=str, default="0.0.0.0")
-    parser.add_argument("--debug", action="store_true")
     args = parser.parse_args()
 
-    print(f"보세전시장 챗봇 웹 서버 시작: http://{args.host}:{args.port}")
-    app.run(host=args.host, port=args.port, debug=args.debug)
+    logger.info(f"보세전시장 챗봇 웹 서버 시작: http://{args.host}:{args.port}")
+    app.run(host=args.host, port=args.port, debug=False)
 
 
 if __name__ == "__main__":

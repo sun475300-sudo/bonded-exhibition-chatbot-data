@@ -86,10 +86,10 @@ class TestBuildUnknownResponse:
     """build_unknown_response 함수 테스트."""
 
     def test_unknown_response_has_disclaimer(self):
-        result = build_unknown_response("알 수 없는 질문")
+        result = build_unknown_response()
         assert "단정하기 어렵습니다" in result
         assert "고객지원센터" in result
 
     def test_unknown_response_has_guidance(self):
-        result = build_unknown_response("이상한 질문")
+        result = build_unknown_response()
         assert "관할 세관" in result

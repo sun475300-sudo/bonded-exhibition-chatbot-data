@@ -3,7 +3,7 @@
 사용자 질문을 10개 카테고리 중 하나 이상으로 분류한다.
 """
 
-from src.utils import load_json
+from src.utils import normalize_query
 
 CATEGORY_KEYWORDS = {
     "GENERAL": [
@@ -59,6 +59,20 @@ CATEGORY_KEYWORDS = {
     ]
 }
 
+# 도메인 우선순위: 동점 시 더 구체적인 카테고리를 선호
+CATEGORY_PRIORITY = {
+    "PENALTIES": 1,
+    "FOOD_TASTING": 2,
+    "SAMPLE": 3,
+    "SALES": 4,
+    "DOCUMENTS": 5,
+    "CONTACT": 6,
+    "IMPORT_EXPORT": 7,
+    "EXHIBITION": 8,
+    "LICENSE": 9,
+    "GENERAL": 10,
+}
+
 
 def classify_query(query: str) -> list[str]:
     """사용자 질문을 카테고리로 분류한다.
@@ -69,7 +83,10 @@ def classify_query(query: str) -> list[str]:
     Returns:
         매칭된 카테고리 코드 리스트 (최소 1개). 매칭 없으면 ["GENERAL"].
     """
-    query_lower = query.lower()
+    if not query:
+        return ["GENERAL"]
+
+    query_lower = normalize_query(query)
     scores = {}
 
     for category, keywords in CATEGORY_KEYWORDS.items():
@@ -84,9 +101,12 @@ def classify_query(query: str) -> list[str]:
         return ["GENERAL"]
 
     max_score = max(scores.values())
-    results = [cat for cat, sc in scores.items() if sc >= max_score]
+    results = [cat for cat, sc in scores.items() if sc == max_score]
 
-    return sorted(results)
+    # 도메인 우선순위로 정렬 (구체적 카테고리 우선)
+    results.sort(key=lambda c: CATEGORY_PRIORITY.get(c, 99))
+
+    return results
 
 
 def get_primary_category(query: str) -> str:

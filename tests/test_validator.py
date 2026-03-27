@@ -3,7 +3,6 @@
 import pytest
 from src.validator import (
     get_needed_confirmations,
-    format_confirmation_section,
     CONFIRMATION_QUESTIONS,
 )
 
@@ -42,25 +41,11 @@ class TestGetNeededConfirmations:
         questions = [c["question"] for c in result]
         assert len(questions) == len(set(questions))
 
+    def test_penalties_asks_customs_consulted(self):
+        result = get_needed_confirmations("PENALTIES", "벌칙이 있나요?")
+        questions = [c["question"] for c in result]
+        assert any("세관" in q for q in questions)
 
-class TestFormatConfirmationSection:
-    """format_confirmation_section 함수 테스트."""
-
-    def test_empty_returns_empty(self):
-        result = format_confirmation_section([])
-        assert result == ""
-
-    def test_formats_with_header(self):
-        items = [{"question": "테스트 질문?", "why": "이유"}]
-        result = format_confirmation_section(items)
-        assert "민원인이 확인할 사항:" in result
-        assert "테스트 질문?" in result
-
-    def test_formats_multiple_items(self):
-        items = [
-            {"question": "질문1?", "why": "이유1"},
-            {"question": "질문2?", "why": "이유2"},
-        ]
-        result = format_confirmation_section(items)
-        assert "질문1?" in result
-        assert "질문2?" in result
+    def test_none_query_no_crash(self):
+        result = get_needed_confirmations("GENERAL", "")
+        assert isinstance(result, list)
