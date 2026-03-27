@@ -18,9 +18,12 @@ from flask import Flask, request, jsonify, send_from_directory
 from src.chatbot import BondedExhibitionChatbot
 from src.classifier import classify_query
 from src.escalation import check_escalation
+from src.analytics import QueryAnalytics
+from src.auto_faq_pipeline import AutoFAQPipeline
 from src.faq_recommender import FAQRecommender
 from src.feedback import FeedbackManager
 from src.logger_db import ChatLogger
+from src.security import APIKeyAuth, RateLimiter, sanitize_input
 from src.translator import SimpleTranslator
 
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
@@ -43,6 +46,15 @@ chat_logger = ChatLogger(db_path=os.path.join(BASE_DIR, "logs", "chat_logs.db"))
 feedback_manager = FeedbackManager(db_path=os.path.join(BASE_DIR, "logs", "feedback.db"))
 translator = SimpleTranslator()
 faq_recommender = FAQRecommender(chat_logger)
+query_analytics = QueryAnalytics(chat_logger, feedback_manager)
+auto_faq_pipeline = AutoFAQPipeline(
+    faq_recommender, faq_path=os.path.join(BASE_DIR, "data", "faq.json")
+)
+
+# 보안 미들웨어 초기화
+api_key_auth = APIKeyAuth(app)
+rate_limit_value = int(os.environ.get("CHATBOT_RATE_LIMIT", "60"))
+rate_limiter = RateLimiter(max_requests=rate_limit_value)
 
 
 @app.errorhandler(400)
@@ -84,6 +96,11 @@ def service_worker():
 @app.route("/api/chat", methods=["POST"])
 def chat():
     """사용자 질문을 처리하여 답변을 반환한다."""
+    # Rate Limiting 적용
+    client_ip = request.remote_addr or "unknown"
+    if not rate_limiter.is_allowed(client_ip):
+        return jsonify({"error": "요청이 너무 많습니다. 잠시 후 다시 시도해 주세요."}), 429
+
     data = request.get_json(silent=True)
     if not data or "query" not in data:
         return jsonify({"error": "query 필드가 필요합니다."}), 400
@@ -92,7 +109,8 @@ def chat():
     if not isinstance(raw_query, str):
         return jsonify({"error": "query는 문자열이어야 합니다."}), 400
 
-    query = raw_query.strip()
+    # 입력 살균 적용
+    query = sanitize_input(raw_query, max_length=MAX_QUERY_LENGTH)
     if not query:
         return jsonify({"error": "질문을 입력해 주세요."}), 400
 
@@ -265,6 +283,81 @@ def admin_feedback():
     stats = feedback_manager.get_feedback_stats()
     low_rated = feedback_manager.get_low_rated_queries(limit=20)
     return jsonify({"stats": stats, "low_rated_queries": low_rated})
+
+
+@app.route("/api/admin/analytics", methods=["GET"])
+def admin_analytics():
+    """분석 리포트를 반환한다."""
+    try:
+        days = request.args.get("days", 7, type=int)
+        trend = query_analytics.get_trend_report(days=days)
+        quality = query_analytics.get_quality_score()
+        peak_hours = query_analytics.get_peak_hours()
+        return jsonify({
+            "trend": trend,
+            "quality": quality,
+            "peak_hours": peak_hours,
+        })
+    except Exception as e:
+        logger.error(f"분석 리포트 생성 실패: {e}")
+        return jsonify({"error": "분석 리포트 생성 중 오류가 발생했습니다."}), 500
+
+
+@app.route("/api/admin/report", methods=["GET"])
+def admin_report():
+    """주간 리포트 텍스트를 반환한다."""
+    try:
+        report_text = query_analytics.generate_report_text()
+        return jsonify({"report": report_text})
+    except Exception as e:
+        logger.error(f"주간 리포트 생성 실패: {e}")
+        return jsonify({"error": "주간 리포트 생성 중 오류가 발생했습니다."}), 500
+
+
+@app.route("/api/admin/faq-pipeline", methods=["GET"])
+def admin_faq_pipeline():
+    """FAQ 후보 목록을 반환한다."""
+    try:
+        min_freq = request.args.get("min_frequency", 3, type=int)
+        candidates = auto_faq_pipeline.get_pending_candidates(min_frequency=min_freq)
+        return jsonify({"candidates": candidates, "count": len(candidates)})
+    except Exception as e:
+        logger.error(f"FAQ 파이프라인 조회 실패: {e}")
+        return jsonify({"error": "FAQ 파이프라인 조회 중 오류가 발생했습니다."}), 500
+
+
+@app.route("/api/admin/faq-pipeline/approve", methods=["POST"])
+def admin_faq_approve():
+    """FAQ 후보를 승인한다."""
+    data = request.get_json(silent=True)
+    if not data or "candidate_id" not in data:
+        return jsonify({"error": "candidate_id 필드가 필요합니다."}), 400
+
+    try:
+        result = auto_faq_pipeline.approve_candidate(data["candidate_id"])
+        return jsonify({"success": True, "candidate": result})
+    except ValueError as e:
+        return jsonify({"error": str(e)}), 400
+    except Exception as e:
+        logger.error(f"FAQ 후보 승인 실패: {e}")
+        return jsonify({"error": "FAQ 후보 승인 중 오류가 발생했습니다."}), 500
+
+
+@app.route("/api/admin/faq-pipeline/reject", methods=["POST"])
+def admin_faq_reject():
+    """FAQ 후보를 거부한다."""
+    data = request.get_json(silent=True)
+    if not data or "candidate_id" not in data:
+        return jsonify({"error": "candidate_id 필드가 필요합니다."}), 400
+
+    try:
+        result = auto_faq_pipeline.reject_candidate(data["candidate_id"])
+        return jsonify({"success": True, "candidate": result})
+    except ValueError as e:
+        return jsonify({"error": str(e)}), 400
+    except Exception as e:
+        logger.error(f"FAQ 후보 거부 실패: {e}")
+        return jsonify({"error": "FAQ 후보 거부 중 오류가 발생했습니다."}), 500
 
 
 def main():
