@@ -119,6 +119,74 @@
 
         .two-col { display: grid; grid-template-columns: 1fr 1fr; gap: 1.5rem; }
         @media (max-width: 768px) { .two-col { grid-template-columns: 1fr; } }
+
+        /* 품질 게이지 */
+        .quality-gauge {
+            width: 120px; height: 120px;
+            border-radius: 50%;
+            background: conic-gradient(#27ae60 var(--score-pct), #e9ecef var(--score-pct));
+            display: flex; align-items: center; justify-content: center;
+            margin: 0 auto 0.8rem;
+        }
+        .quality-gauge-inner {
+            width: 90px; height: 90px;
+            border-radius: 50%;
+            background: #fff;
+            display: flex; align-items: center; justify-content: center;
+            font-size: 1.5rem; font-weight: 700; color: #1a3a5c;
+        }
+
+        /* 트렌드 바 */
+        .trend-bar-row {
+            display: flex; align-items: center; margin-bottom: 0.4rem;
+        }
+        .trend-bar-row .trend-date {
+            width: 80px; font-size: 0.8rem; color: #555; text-align: right; padding-right: 0.5rem; flex-shrink: 0;
+        }
+        .trend-bar-row .trend-track {
+            flex: 1; background: #e9ecef; border-radius: 4px; height: 18px; overflow: hidden;
+        }
+        .trend-bar-row .trend-fill {
+            height: 100%; background: #2ecc71; border-radius: 4px; transition: width 0.6s ease;
+        }
+        .trend-bar-row .trend-count {
+            width: 40px; font-size: 0.8rem; padding-left: 0.4rem; color: #555;
+        }
+
+        /* 시간대 분포 */
+        .hour-chart { display: flex; align-items: flex-end; gap: 2px; height: 80px; margin-top: 0.5rem; }
+        .hour-bar {
+            flex: 1; background: #3498db; border-radius: 2px 2px 0 0;
+            min-height: 2px; transition: height 0.4s ease; position: relative;
+        }
+        .hour-bar:hover::after {
+            content: attr(data-label);
+            position: absolute; bottom: 100%; left: 50%; transform: translateX(-50%);
+            background: #333; color: #fff; padding: 2px 6px; border-radius: 3px;
+            font-size: 0.7rem; white-space: nowrap;
+        }
+        .hour-labels { display: flex; gap: 2px; font-size: 0.65rem; color: #999; margin-top: 2px; }
+        .hour-labels span { flex: 1; text-align: center; }
+
+        /* FAQ 파이프라인 */
+        .candidate-card {
+            border: 1px solid #dee2e6; border-radius: 6px; padding: 1rem; margin-bottom: 0.8rem;
+        }
+        .candidate-card .candidate-q { font-weight: 600; color: #1a3a5c; margin-bottom: 0.3rem; }
+        .candidate-card .candidate-meta { font-size: 0.8rem; color: #888; margin-bottom: 0.5rem; }
+        .candidate-card .candidate-actions { display: flex; gap: 0.5rem; }
+        .btn {
+            padding: 0.4rem 1rem; border: none; border-radius: 4px; cursor: pointer;
+            font-size: 0.85rem; font-weight: 600;
+        }
+        .btn-approve { background: #27ae60; color: #fff; }
+        .btn-approve:hover { background: #219a52; }
+        .btn-reject { background: #e74c3c; color: #fff; }
+        .btn-reject:hover { background: #c0392b; }
+        .section-title {
+            font-size: 1.2rem; font-weight: 700; color: #1a3a5c;
+            margin: 2rem 0 1rem; padding-bottom: 0.5rem; border-bottom: 2px solid #1a3a5c;
+        }
     </style>
 </head>
 <body>
@@ -231,6 +299,66 @@
                         <tr><td colspan="6" class="loading">로딩 중...</td></tr>
                     </tbody>
                 </table>
+            </div>
+        </div>
+
+        <!-- 분석/인텔리전스 섹션 -->
+        <div class="section-title">분석 / 인텔리전스</div>
+
+        <div class="two-col">
+            <!-- 품질 점수 게이지 -->
+            <div class="panel">
+                <h2>답변 품질 점수</h2>
+                <div class="quality-gauge" id="qualityGauge" style="--score-pct: 0%;">
+                    <div class="quality-gauge-inner" id="qualityScore">-</div>
+                </div>
+                <div class="stats-grid" style="margin-bottom:0">
+                    <div class="stat-card">
+                        <div class="label">사용자 만족도</div>
+                        <div class="value" id="qaHelpfulRate" style="font-size:1.3rem;">-</div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="label">FAQ 매칭률</div>
+                        <div class="value" id="qaFaqMatchRate" style="font-size:1.3rem;">-</div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="label">에스컬레이션</div>
+                        <div class="value warning" id="qaEscRate" style="font-size:1.3rem;">-</div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 시간대별 분포 -->
+            <div class="panel">
+                <h2>시간대별 질문 분포</h2>
+                <p class="hint">가장 바쁜 시간: <strong id="peakHourText">-</strong></p>
+                <div class="hour-chart" id="hourChart"></div>
+                <div class="hour-labels" id="hourLabels"></div>
+            </div>
+        </div>
+
+        <!-- 일별 트렌드 -->
+        <div class="panel">
+            <h2>일별 질문 트렌드 (최근 7일)</h2>
+            <div class="bar-chart" id="trendChart">
+                <div class="loading">데이터 로딩 중...</div>
+            </div>
+        </div>
+
+        <!-- 주간 리포트 텍스트 -->
+        <div class="panel">
+            <h2>주간 리포트</h2>
+            <pre id="weeklyReportText" style="white-space:pre-wrap; font-size:0.85rem; color:#444; background:#f8f9fa; padding:1rem; border-radius:6px; max-height:400px; overflow-y:auto;">로딩 중...</pre>
+        </div>
+
+        <!-- FAQ 자동 등록 파이프라인 섹션 -->
+        <div class="section-title">FAQ 자동 등록 파이프라인</div>
+
+        <div class="panel">
+            <h2>FAQ 후보 목록</h2>
+            <p class="hint">빈도 3회 이상 미매칭 질문이 후보로 표시됩니다. 승인하면 faq.json에 자동 추가됩니다.</p>
+            <div id="pipelineCandidates" style="margin-top:1rem;">
+                <div class="loading">로딩 중...</div>
             </div>
         </div>
     </div>
@@ -364,14 +492,147 @@
             }
         }
 
+        async function loadAnalytics() {
+            try {
+                const res = await fetch(API_BASE + "/api/admin/analytics");
+                const data = await res.json();
+
+                // 품질 점수 게이지
+                const score = data.quality.overall_score;
+                document.getElementById("qualityScore").textContent = score;
+                document.getElementById("qualityGauge").style.setProperty("--score-pct", score + "%");
+                document.getElementById("qaHelpfulRate").textContent = data.quality.helpful_rate + "%";
+                document.getElementById("qaFaqMatchRate").textContent = data.quality.faq_match_rate + "%";
+                document.getElementById("qaEscRate").textContent = data.quality.escalation_rate + "%";
+
+                // 시간대별 분포
+                renderHourChart(data.peak_hours);
+
+                // 일별 트렌드
+                renderTrendChart(data.trend.daily_counts);
+            } catch (e) {
+                console.error("분석 로딩 실패:", e);
+            }
+        }
+
+        function renderHourChart(peakData) {
+            const container = document.getElementById("hourChart");
+            const labels = document.getElementById("hourLabels");
+            const maxCount = Math.max(...peakData.hours.map(h => h.count), 1);
+
+            document.getElementById("peakHourText").textContent =
+                peakData.peak_hour + "시 (" + peakData.peak_count + "건)";
+
+            container.innerHTML = peakData.hours.map(h => {
+                const pct = (h.count / maxCount) * 100;
+                return '<div class="hour-bar" style="height:' + pct + '%" data-label="' + h.hour + '시: ' + h.count + '건"></div>';
+            }).join("");
+
+            labels.innerHTML = peakData.hours.filter((_, i) => i % 3 === 0).map(h =>
+                '<span>' + h.hour + '</span>'
+            ).join("");
+        }
+
+        function renderTrendChart(dailyCounts) {
+            const container = document.getElementById("trendChart");
+            if (!dailyCounts || dailyCounts.length === 0) {
+                container.innerHTML = "<div class='loading'>데이터 없음</div>";
+                return;
+            }
+            const maxVal = Math.max(...dailyCounts.map(d => d.count), 1);
+            container.innerHTML = dailyCounts.map(d => {
+                const pct = (d.count / maxVal) * 100;
+                return '<div class="trend-bar-row">' +
+                    '<div class="trend-date">' + d.date.substring(5) + '</div>' +
+                    '<div class="trend-track"><div class="trend-fill" style="width:' + pct + '%"></div></div>' +
+                    '<div class="trend-count">' + d.count + '</div></div>';
+            }).join("");
+        }
+
+        async function loadWeeklyReport() {
+            try {
+                const res = await fetch(API_BASE + "/api/admin/report");
+                const data = await res.json();
+                document.getElementById("weeklyReportText").textContent = data.report || "리포트 없음";
+            } catch (e) {
+                console.error("주간 리포트 로딩 실패:", e);
+            }
+        }
+
+        async function loadFAQPipeline() {
+            try {
+                const res = await fetch(API_BASE + "/api/admin/faq-pipeline");
+                const data = await res.json();
+                const container = document.getElementById("pipelineCandidates");
+
+                if (!data.candidates || data.candidates.length === 0) {
+                    container.innerHTML = "<div class='loading'>FAQ 후보 없음</div>";
+                    return;
+                }
+
+                container.innerHTML = data.candidates.map(c =>
+                    '<div class="candidate-card" id="candidate-' + c.id + '">' +
+                    '<div class="candidate-q">' + escapeHtml(c.suggested_question) + '</div>' +
+                    '<div class="candidate-meta">빈도: ' + c.frequency + '회 | 카테고리: ' + escapeHtml(c.suggested_category || "-") + '</div>' +
+                    '<div class="candidate-actions">' +
+                    '<button class="btn btn-approve" onclick="approveCandidate(' + c.id + ')">승인</button>' +
+                    '<button class="btn btn-reject" onclick="rejectCandidate(' + c.id + ')">거부</button>' +
+                    '</div></div>'
+                ).join("");
+            } catch (e) {
+                console.error("FAQ 파이프라인 로딩 실패:", e);
+            }
+        }
+
+        async function approveCandidate(id) {
+            try {
+                const res = await fetch(API_BASE + "/api/admin/faq-pipeline/approve", {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({ candidate_id: id })
+                });
+                const data = await res.json();
+                if (data.success) {
+                    const el = document.getElementById("candidate-" + id);
+                    if (el) el.style.display = "none";
+                } else {
+                    alert(data.error || "승인 실패");
+                }
+            } catch (e) {
+                console.error("승인 실패:", e);
+            }
+        }
+
+        async function rejectCandidate(id) {
+            try {
+                const res = await fetch(API_BASE + "/api/admin/faq-pipeline/reject", {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({ candidate_id: id })
+                });
+                const data = await res.json();
+                if (data.success) {
+                    const el = document.getElementById("candidate-" + id);
+                    if (el) el.style.display = "none";
+                } else {
+                    alert(data.error || "거부 실패");
+                }
+            } catch (e) {
+                console.error("거부 실패:", e);
+            }
+        }
+
         // 초기 로딩
         loadStats();
         loadLogs();
         loadUnmatched();
         loadFeedback();
+        loadAnalytics();
+        loadWeeklyReport();
+        loadFAQPipeline();
 
         // 30초마다 자동 갱신
-        setInterval(() => { loadStats(); loadLogs(); loadUnmatched(); loadFeedback(); }, 30000);
+        setInterval(() => { loadStats(); loadLogs(); loadUnmatched(); loadFeedback(); loadAnalytics(); loadFAQPipeline(); }, 30000);
     </script>
 </body>
 </html>
