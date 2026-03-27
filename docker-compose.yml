@@ -11,6 +11,34 @@ services:
     restart: unless-stopped
     environment:
       - PYTHONUNBUFFERED=1
+      - CHATBOT_PORT=8080
+      - CHATBOT_HOST=0.0.0.0
+      - CHATBOT_DEBUG=false
+      - CHATBOT_LOG_LEVEL=INFO
+      - CHATBOT_DB_PATH=logs/chat_logs.db
+      # - CHATBOT_API_KEYS=key1,key2
+    healthcheck:
+      test: ["CMD", "python", "deploy/healthcheck.py", "--host", "127.0.0.1", "--port", "8080"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 15s
+
+  # Nginx 리버스 프록시 (선택적 - 필요 시 주석 해제)
+  # nginx:
+  #   image: nginx:alpine
+  #   ports:
+  #     - "80:80"
+  #     - "443:443"
+  #   volumes:
+  #     - ./deploy/nginx.conf:/etc/nginx/conf.d/default.conf:ro
+  #     - ./web:/app/web:ro
+  #     # SSL 인증서 (certbot 사용 시)
+  #     # - /etc/letsencrypt:/etc/letsencrypt:ro
+  #   depends_on:
+  #     chatbot:
+  #       condition: service_healthy
+  #   restart: unless-stopped
 
 volumes:
   chatbot-logs:

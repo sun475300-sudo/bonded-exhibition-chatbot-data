@@ -1,0 +1,21 @@
+{
+    "api_keys": {
+        "enabled": false,
+        "keys": [],
+        "description": "API Key 인증 설정. enabled를 true로 변경하고 keys에 키를 추가하면 활성화됩니다. 또는 환경변수 CHATBOT_API_KEYS를 설정하세요."
+    },
+    "rate_limit": {
+        "enabled": true,
+        "max_requests": 60,
+        "window_seconds": 60,
+        "description": "IP 기반 레이트 리밋 설정. /api/chat 엔드포인트에만 적용됩니다."
+    },
+    "exempt_paths": [
+        "/",
+        "/api/health",
+        "/admin",
+        "/static",
+        "/manifest.json",
+        "/sw.js"
+    ]
+}
