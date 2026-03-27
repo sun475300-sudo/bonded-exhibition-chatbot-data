@@ -172,6 +172,46 @@
             </div>
         </div>
 
+        <!-- 피드백 통계 -->
+        <div class="two-col">
+            <div class="panel">
+                <h2>사용자 만족도</h2>
+                <div class="stats-grid" style="margin-bottom:0">
+                    <div class="stat-card">
+                        <div class="label">전체 피드백</div>
+                        <div class="value" id="fbTotal">-</div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="label">만족도</div>
+                        <div class="value" id="fbRate">-</div>
+                    </div>
+                </div>
+                <div style="margin-top:1rem; display:flex; gap:1rem;">
+                    <div style="flex:1; text-align:center;">
+                        <div style="font-size:2rem; font-weight:700; color:#27ae60;" id="fbHelpful">0</div>
+                        <div style="font-size:0.85rem; color:#666;">유용해요</div>
+                    </div>
+                    <div style="flex:1; text-align:center;">
+                        <div style="font-size:2rem; font-weight:700; color:#e67e22;" id="fbUnhelpful">0</div>
+                        <div style="font-size:0.85rem; color:#666;">아쉬워요</div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="panel">
+                <h2>낮은 평가 질문</h2>
+                <p class="hint">사용자가 '아쉬워요'로 평가한 질문입니다. 답변 개선을 검토하세요.</p>
+                <div class="table-wrap" style="margin-top:0.8rem;">
+                    <table>
+                        <thead><tr><th>질문 ID</th><th>코멘트</th><th>시간</th></tr></thead>
+                        <tbody id="lowRatedBody">
+                            <tr><td colspan="3" class="loading">로딩 중...</td></tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+
         <!-- 최근 질문 로그 -->
         <div class="panel">
             <h2>최근 질문 로그</h2>
@@ -295,13 +335,43 @@
             }
         }
 
+        async function loadFeedback() {
+            try {
+                const res = await fetch(API_BASE + "/api/admin/feedback");
+                const data = await res.json();
+                const stats = data.stats;
+
+                document.getElementById("fbTotal").textContent = stats.total;
+                document.getElementById("fbRate").textContent = stats.helpful_rate + "%";
+                document.getElementById("fbHelpful").textContent = stats.helpful_count;
+                document.getElementById("fbUnhelpful").textContent = stats.unhelpful_count;
+
+                const tbody = document.getElementById("lowRatedBody");
+                const queries = data.low_rated_queries;
+                if (!queries || queries.length === 0) {
+                    tbody.innerHTML = "<tr><td colspan='3' class='loading'>낮은 평가 질문 없음</td></tr>";
+                    return;
+                }
+                tbody.innerHTML = queries.map(q => `
+                    <tr>
+                        <td>${escapeHtml(q.query_id)}</td>
+                        <td>${escapeHtml(q.comment || "-")}</td>
+                        <td style="white-space:nowrap">${escapeHtml(q.timestamp)}</td>
+                    </tr>
+                `).join("");
+            } catch (e) {
+                console.error("피드백 로딩 실패:", e);
+            }
+        }
+
         // 초기 로딩
         loadStats();
         loadLogs();
         loadUnmatched();
+        loadFeedback();
 
         // 30초마다 자동 갱신
-        setInterval(() => { loadStats(); loadLogs(); loadUnmatched(); }, 30000);
+        setInterval(() => { loadStats(); loadLogs(); loadUnmatched(); loadFeedback(); }, 30000);
     </script>
 </body>
 </html>

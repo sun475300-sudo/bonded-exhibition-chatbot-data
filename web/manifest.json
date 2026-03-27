@@ -1,0 +1,25 @@
+{
+  "name": "보세전시장 민원응대 챗봇",
+  "short_name": "보세전시장 챗봇",
+  "description": "보세전시장 관련 민원 응대를 위한 AI 챗봇",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#0f1923",
+  "theme_color": "#1565C0",
+  "orientation": "portrait-primary",
+  "lang": "ko",
+  "icons": [
+    {
+      "src": "/static/icon-192.svg",
+      "sizes": "192x192",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "/static/icon-512.svg",
+      "sizes": "512x512",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    }
+  ]
+}

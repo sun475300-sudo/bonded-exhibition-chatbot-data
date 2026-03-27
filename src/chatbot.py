@@ -8,6 +8,7 @@ from src.escalation import check_escalation, get_escalation_contact
 from src.response_builder import build_response, build_unknown_response
 from src.session import SessionManager
 from src.similarity import TFIDFMatcher
+from src.smart_classifier import SmartClassifier
 from src.validator import get_needed_confirmations
 from src.utils import load_json, load_text, normalize_query
 
@@ -28,6 +29,7 @@ class BondedExhibitionChatbot:
         self.faq_items = self.faq_data.get("items", [])
         self.tfidf_matcher = TFIDFMatcher(self.faq_items)
         self.session_manager = SessionManager()
+        self.smart_classifier = SmartClassifier()
 
     def get_persona(self) -> str:
         """챗봇 페르소나 인사말을 반환한다."""
@@ -119,7 +121,10 @@ class BondedExhibitionChatbot:
 
     def _process_new_query(self, query: str, session=None) -> str:
         """새 질문을 처리한다. 세션이 있으면 대화 기록 및 확인 질문을 관리한다."""
-        categories = classify_query(query)
+        if session:
+            categories = self.smart_classifier.classify_with_context(query, session)
+        else:
+            categories = classify_query(query)
         if not categories:
             categories = ["GENERAL"]
         primary_category = categories[0]
