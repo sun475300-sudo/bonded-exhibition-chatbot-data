@@ -1,0 +1,36 @@
+{
+  "ui": {
+    "header": "Chatbot Tư vấn Khu Triển lãm Ngoại quan",
+    "send_button": "Gửi",
+    "input_placeholder": "Nhập câu hỏi của bạn...",
+    "tooltip_new_chat": "Bắt đầu cuộc trò chuyện mới",
+    "tooltip_export": "Xuất cuộc trò chuyện",
+    "tooltip_feedback": "Gửi phản hồi",
+    "loading": "Đang tạo câu trả lời..."
+  },
+  "messages": {
+    "welcome": "Xin chào! Tôi là Chatbot Tư vấn Khu Triển lãm Ngoại quan. Tôi có thể giúp gì cho bạn?",
+    "error": "Xin lỗi, đã xảy ra lỗi. Vui lòng thử lại.",
+    "unknown_query": "Xin lỗi, không tìm thấy câu trả lời cho câu hỏi của bạn. Vui lòng thử câu hỏi khác.",
+    "session_expired": "Phiên đã hết hạn. Vui lòng bắt đầu cuộc trò chuyện mới.",
+    "rate_limited": "Quá nhiều yêu cầu. Vui lòng thử lại sau."
+  },
+  "categories": {
+    "GENERAL": "Hướng dẫn chung",
+    "IMPORT_EXPORT": "Nhập/Xuất",
+    "SALES": "Bán hàng tại chỗ",
+    "SAMPLE": "Hàng mẫu",
+    "FOOD_TASTING": "Nếm thử thực phẩm",
+    "LICENSE": "Giấy phép",
+    "EXHIBITION": "Vận hành triển lãm",
+    "DOCUMENTS": "Tài liệu/Khai báo",
+    "PENALTIES": "Vi phạm/Xử phạt",
+    "CONTACT": "Thông tin liên hệ"
+  },
+  "sections": {
+    "conclusion": "Kết luận",
+    "description": "Mô tả",
+    "legal_basis": "Căn cứ pháp lý",
+    "disclaimer": "Miễn trừ trách nhiệm"
+  }
+}

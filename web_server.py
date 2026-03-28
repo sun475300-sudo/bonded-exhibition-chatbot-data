@@ -49,6 +49,10 @@ from src.backup_manager import BackupManager
 from src.faq_manager import FAQManager
 from src.tenant_manager import TenantManager
 from src.webhook_manager import WebhookManager
+from src.audit_logger import AuditLogger
+from src.alert_center import AlertCenter, AlertRuleEngine
+from src.profiler import Profiler, RequestProfiler, ComponentBenchmark
+from src.i18n import I18nManager
 from src.utils import load_json
 
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
@@ -70,6 +74,7 @@ chatbot = BondedExhibitionChatbot()
 chat_logger = ChatLogger(db_path=os.path.join(BASE_DIR, "logs", "chat_logs.db"))
 feedback_manager = FeedbackManager(db_path=os.path.join(BASE_DIR, "logs", "feedback.db"))
 translator = SimpleTranslator()
+i18n_manager = I18nManager()
 faq_recommender = FAQRecommender(chat_logger)
 query_analytics = QueryAnalytics(chat_logger, feedback_manager)
 report_generator = ReportGenerator(chat_logger, feedback_manager)
@@ -109,6 +114,22 @@ tenant_manager = TenantManager()
 # FAQ 관리자 초기화
 faq_manager = FAQManager()
 
+# 감사 로거 초기화
+audit_logger = AuditLogger()
+
+# 알림 센터 초기화
+alert_center = AlertCenter()
+alert_rule_engine = AlertRuleEngine(
+    alert_center,
+    realtime_monitor=realtime_monitor,
+    satisfaction_tracker=satisfaction_tracker,
+    faq_quality_checker=faq_quality_checker,
+)
+
+# 프로파일러 초기화
+request_profiler = RequestProfiler()
+component_benchmark = ComponentBenchmark()
+
 # --- FAQ in-memory cache ---
 _faq_cache: dict = {}
 
@@ -120,6 +141,19 @@ def _refresh_faq_cache():
 
 
 _refresh_faq_cache()
+
+
+def _get_audit_actor():
+    """Extract actor username from JWT payload or return default."""
+    payload = getattr(request, "jwt_payload", None)
+    if payload:
+        return payload.get("sub", "unknown")
+    return "admin"
+
+
+def _get_client_ip():
+    """Extract client IP from request."""
+    return request.remote_addr or "unknown"
 
 
 # --- Response time middleware ---
@@ -463,9 +497,23 @@ def auth_login():
 
     user = authenticate_user(data["username"], data["password"])
     if user is None:
+        try:
+            audit_logger.log(
+                actor=data["username"], action="login", resource_type="session",
+                details={"success": False}, ip=_get_client_ip(),
+            )
+        except Exception:
+            pass
         return jsonify({"error": "잘못된 사용자명 또는 비밀번호입니다."}), 401
 
     token = jwt_auth.generate_token(user["username"], role=user["role"])
+    try:
+        audit_logger.log(
+            actor=user["username"], action="login", resource_type="session",
+            details={"success": True}, ip=_get_client_ip(),
+        )
+    except Exception:
+        pass
     return jsonify({"token": token, "expires_in": 86400})
 
 
@@ -1104,6 +1152,13 @@ def admin_backup_create():
     """수동 백업을 트리거한다."""
     try:
         backup_path = backup_manager.create_backup()
+        try:
+            audit_logger.log(
+                actor=_get_audit_actor(), action="backup", resource_type="backup",
+                resource_id=os.path.basename(backup_path), ip=_get_client_ip(),
+            )
+        except Exception:
+            pass
         return jsonify({
             "success": True,
             "backup_path": backup_path,
@@ -1142,6 +1197,13 @@ def admin_restore():
 
     try:
         result = backup_manager.restore_from_backup(backup_path)
+        try:
+            audit_logger.log(
+                actor=_get_audit_actor(), action="restore", resource_type="backup",
+                resource_id=filename, ip=_get_client_ip(),
+            )
+        except Exception:
+            pass
         return jsonify({"success": True, **result})
     except Exception as e:
         logger.error(f"복원 실패: {e}")
@@ -1162,6 +1224,13 @@ def admin_backup_delete(backup_id):
         enc_path = backup_path + ".enc"
         if os.path.isfile(enc_path):
             os.remove(enc_path)
+        try:
+            audit_logger.log(
+                actor=_get_audit_actor(), action="delete", resource_type="backup",
+                resource_id=backup_id, ip=_get_client_ip(),
+            )
+        except Exception:
+            pass
         return jsonify({"success": True, "deleted": backup_id})
     except Exception as e:
         logger.error(f"백업 삭제 실패: {e}")
@@ -1296,6 +1365,14 @@ def admin_create_tenant():
             name=data["name"],
             config=data.get("config"),
         )
+        try:
+            audit_logger.log(
+                actor=_get_audit_actor(), action="create", resource_type="tenant",
+                resource_id=data["tenant_id"], details={"name": data["name"]},
+                ip=_get_client_ip(),
+            )
+        except Exception:
+            pass
         return jsonify({"success": True, "tenant": tenant}), 201
     except ValueError as e:
         return jsonify({"error": str(e)}), 400
@@ -1314,6 +1391,14 @@ def admin_update_tenant(tenant_id):
 
     try:
         tenant = tenant_manager.update_tenant(tenant_id, data)
+        try:
+            audit_logger.log(
+                actor=_get_audit_actor(), action="update", resource_type="tenant",
+                resource_id=tenant_id, details={"fields": list(data.keys())},
+                ip=_get_client_ip(),
+            )
+        except Exception:
+            pass
         return jsonify({"success": True, "tenant": tenant})
     except ValueError as e:
         return jsonify({"error": str(e)}), 404
@@ -1328,6 +1413,13 @@ def admin_delete_tenant(tenant_id):
     """테넌트를 삭제한다."""
     try:
         tenant_manager.delete_tenant(tenant_id)
+        try:
+            audit_logger.log(
+                actor=_get_audit_actor(), action="delete", resource_type="tenant",
+                resource_id=tenant_id, ip=_get_client_ip(),
+            )
+        except Exception:
+            pass
         return jsonify({"success": True})
     except ValueError as e:
         return jsonify({"error": str(e)}), 400
@@ -1395,6 +1487,14 @@ def admin_faq_create():
     try:
         item = faq_manager.create(data)
         _reload_chatbot_faq()
+        try:
+            audit_logger.log(
+                actor=_get_audit_actor(), action="create", resource_type="faq",
+                resource_id=item.get("id"), details={"question": data.get("question", "")},
+                ip=_get_client_ip(),
+            )
+        except Exception:
+            pass
         return jsonify({"success": True, "item": item}), 201
     except ValueError as e:
         return jsonify({"error": str(e)}), 400
@@ -1414,6 +1514,14 @@ def admin_faq_update(faq_id):
     try:
         item = faq_manager.update(faq_id, data)
         _reload_chatbot_faq()
+        try:
+            audit_logger.log(
+                actor=_get_audit_actor(), action="update", resource_type="faq",
+                resource_id=faq_id, details={"fields": list(data.keys())},
+                ip=_get_client_ip(),
+            )
+        except Exception:
+            pass
         return jsonify({"success": True, "item": item})
     except KeyError as e:
         return jsonify({"error": str(e)}), 404
@@ -1431,6 +1539,13 @@ def admin_faq_delete(faq_id):
     try:
         deleted = faq_manager.delete(faq_id)
         _reload_chatbot_faq()
+        try:
+            audit_logger.log(
+                actor=_get_audit_actor(), action="delete", resource_type="faq",
+                resource_id=faq_id, ip=_get_client_ip(),
+            )
+        except Exception:
+            pass
         return jsonify({"success": True, "deleted": deleted})
     except KeyError as e:
         return jsonify({"error": str(e)}), 404
@@ -1488,6 +1603,14 @@ def admin_webhook_register():
 
     try:
         subscription_id = webhook_manager.register(url, events, secret)
+        try:
+            audit_logger.log(
+                actor=_get_audit_actor(), action="create", resource_type="webhook",
+                resource_id=subscription_id, details={"url": url, "events": events},
+                ip=_get_client_ip(),
+            )
+        except Exception:
+            pass
         return jsonify({"success": True, "subscription_id": subscription_id}), 201
     except ValueError as e:
         return jsonify({"error": str(e)}), 400
@@ -1515,6 +1638,13 @@ def admin_webhook_unregister(subscription_id):
     try:
         removed = webhook_manager.unregister(subscription_id)
         if removed:
+            try:
+                audit_logger.log(
+                    actor=_get_audit_actor(), action="delete", resource_type="webhook",
+                    resource_id=subscription_id, ip=_get_client_ip(),
+                )
+            except Exception:
+                pass
             return jsonify({"success": True, "subscription_id": subscription_id})
         else:
             return jsonify({"error": "구독을 찾을 수 없습니다."}), 404
@@ -1556,6 +1686,193 @@ def admin_webhook_test():
     except Exception as e:
         logger.error(f"테스트 웹훅 전송 실패: {e}")
         return jsonify({"error": "테스트 웹훅 전송 중 오류가 발생했습니다."}), 500
+
+
+# --- Alert Center API endpoints ---
+
+@app.route("/api/admin/alerts", methods=["GET"])
+@jwt_auth.require_auth()
+def admin_alerts_list():
+    """List alerts with optional filters."""
+    try:
+        unread_only = request.args.get("unread_only", "false").lower() == "true"
+        severity = request.args.get("severity")
+        category = request.args.get("category")
+        limit = int(request.args.get("limit", "50"))
+        alerts = alert_center.get_alerts(
+            unread_only=unread_only, severity=severity, category=category, limit=limit,
+        )
+        return jsonify({"alerts": alerts, "count": len(alerts)})
+    except Exception as e:
+        logger.error(f"알림 목록 조회 실패: {e}")
+        return jsonify({"error": "알림 목록 조회 중 오류가 발생했습니다."}), 500
+
+
+@app.route("/api/admin/alerts/count", methods=["GET"])
+@jwt_auth.require_auth()
+def admin_alerts_count():
+    """Get unread alert count."""
+    try:
+        count = alert_center.get_unread_count()
+        return jsonify({"unread_count": count})
+    except Exception as e:
+        logger.error(f"알림 카운트 조회 실패: {e}")
+        return jsonify({"error": "알림 카운트 조회 중 오류가 발생했습니다."}), 500
+
+
+@app.route("/api/admin/alerts/<alert_id>/read", methods=["POST"])
+@jwt_auth.require_auth()
+def admin_alert_mark_read(alert_id):
+    """Mark a single alert as read."""
+    try:
+        found = alert_center.mark_read(alert_id)
+        if not found:
+            return jsonify({"error": "알림을 찾을 수 없습니다."}), 404
+        return jsonify({"success": True})
+    except Exception as e:
+        logger.error(f"알림 읽음 처리 실패: {e}")
+        return jsonify({"error": "알림 읽음 처리 중 오류가 발생했습니다."}), 500
+
+
+@app.route("/api/admin/alerts/read-all", methods=["POST"])
+@jwt_auth.require_auth()
+def admin_alerts_mark_all_read():
+    """Mark all alerts as read."""
+    try:
+        count = alert_center.mark_all_read()
+        return jsonify({"success": True, "updated_count": count})
+    except Exception as e:
+        logger.error(f"전체 알림 읽음 처리 실패: {e}")
+        return jsonify({"error": "전체 알림 읽음 처리 중 오류가 발생했습니다."}), 500
+
+
+@app.route("/api/admin/alerts/<alert_id>", methods=["DELETE"])
+@jwt_auth.require_auth()
+def admin_alert_delete(alert_id):
+    """Delete an alert."""
+    try:
+        found = alert_center.delete_alert(alert_id)
+        if not found:
+            return jsonify({"error": "알림을 찾을 수 없습니다."}), 404
+        return jsonify({"success": True})
+    except Exception as e:
+        logger.error(f"알림 삭제 실패: {e}")
+        return jsonify({"error": "알림 삭제 중 오류가 발생했습니다."}), 500
+
+
+@app.route("/api/admin/alerts/check", methods=["POST"])
+@jwt_auth.require_auth()
+def admin_alerts_run_checks():
+    """Manually run all alert rule checks."""
+    try:
+        new_alerts = alert_rule_engine.run_all_checks()
+        return jsonify({"success": True, "new_alerts": new_alerts, "count": len(new_alerts)})
+    except Exception as e:
+        logger.error(f"알림 규칙 실행 실패: {e}")
+        return jsonify({"error": "알림 규칙 실행 중 오류가 발생했습니다."}), 500
+
+
+# --- Audit Log API endpoints ---
+
+
+@app.route("/api/admin/audit", methods=["GET"])
+@jwt_auth.require_auth()
+def admin_audit_logs():
+    """Query audit logs with optional filters."""
+    try:
+        actor = request.args.get("actor")
+        action = request.args.get("action")
+        resource_type = request.args.get("resource_type")
+        since = request.args.get("since")
+        limit = request.args.get("limit", 100, type=int)
+
+        logs = audit_logger.get_logs(
+            actor=actor, action=action, resource_type=resource_type,
+            since=since, limit=limit,
+        )
+        return jsonify({"logs": logs, "count": len(logs)})
+    except Exception as e:
+        logger.error(f"감사 로그 조회 실패: {e}")
+        return jsonify({"error": "감사 로그 조회 중 오류가 발생했습니다."}), 500
+
+
+@app.route("/api/admin/audit/stats", methods=["GET"])
+@jwt_auth.require_auth()
+def admin_audit_stats():
+    """Get audit statistics (actions per day, top actors)."""
+    try:
+        since = request.args.get("since")
+        stats = audit_logger.get_stats(since=since)
+        return jsonify(stats)
+    except Exception as e:
+        logger.error(f"감사 통계 조회 실패: {e}")
+        return jsonify({"error": "감사 통계 조회 중 오류가 발생했습니다."}), 500
+
+
+
+
+# --- Profiler API endpoints ---
+
+@app.route("/api/admin/profiler/start", methods=["POST"])
+def admin_profiler_start():
+    """Enable request profiling."""
+    if request_profiler.is_profiling:
+        return jsonify({"message": "Profiling is already active."}), 200
+    request_profiler.start_profiling()
+    return jsonify({"success": True, "message": "Profiling started."})
+
+
+@app.route("/api/admin/profiler/stop", methods=["POST"])
+def admin_profiler_stop():
+    """Disable request profiling and return accumulated results."""
+    if not request_profiler.is_profiling:
+        return jsonify({"error": "Profiling is not active."}), 400
+    results = request_profiler.stop_profiling()
+    return jsonify({"success": True, "results": results})
+
+
+@app.route("/api/admin/profiler/benchmark", methods=["GET"])
+def admin_profiler_benchmark():
+    """Run component benchmarks with small iteration counts."""
+    iterations = request.args.get("iterations", 5, type=int)
+    iterations = max(1, min(iterations, 1000))
+    try:
+        results = {
+            "classifier": component_benchmark.benchmark_classifier(iterations=iterations),
+            "tfidf": component_benchmark.benchmark_tfidf(iterations=iterations),
+            "bm25": component_benchmark.benchmark_bm25(iterations=iterations),
+            "full_pipeline": component_benchmark.benchmark_full_pipeline(iterations=max(1, iterations // 2)),
+        }
+        return jsonify({"success": True, "benchmarks": results})
+    except Exception as e:
+        logger.error(f"벤치마크 실행 실패: {e}")
+        return jsonify({"error": "벤치마크 실행 중 오류가 발생했습니다."}), 500
+
+
+@app.route("/api/admin/profiler/status", methods=["GET"])
+def admin_profiler_status():
+    """Return current profiling status."""
+    return jsonify({
+        "profiling": request_profiler.is_profiling,
+        "summary": request_profiler.get_summary(),
+    })
+
+
+# --- I18n API endpoints ---
+
+@app.route("/api/i18n/languages", methods=["GET"])
+def i18n_languages():
+    """지원 언어 목록을 반환한다."""
+    return jsonify({"languages": i18n_manager.get_supported_languages()})
+
+
+@app.route("/api/i18n/<lang>", methods=["GET"])
+def i18n_locale(lang):
+    """특정 언어의 번역 파일을 반환한다."""
+    data = i18n_manager.load_locale(lang)
+    if not data:
+        return jsonify({"error": f"Locale '{lang}' not found"}), 404
+    return jsonify(data)
 
 
 def main():
