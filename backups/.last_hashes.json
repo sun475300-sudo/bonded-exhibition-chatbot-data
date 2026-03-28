@@ -1,0 +1,22 @@
+{
+  "data/escalation_rules.json": {
+    "size": 2262,
+    "sha256": "dd7d439fdf2de49984ac88275ac5120528ee894bd793159ebe8432e89c20d145"
+  },
+  "data/faq.json": {
+    "size": 38612,
+    "sha256": "c7037025bfd1ebeaf1a4a50650c8a444b31c3ed628447d11863647ad6b459d6a"
+  },
+  "data/faq_pipeline.db": {
+    "size": 12288,
+    "sha256": "77bcb3bcfe128807ea3dae1589e5623616654e891ae94cd12a1796833f18c9eb"
+  },
+  "data/law_versions.db": {
+    "size": 20480,
+    "sha256": "6bd27f22aeba25f6b043b168413b23f275a0406ca9997e8bd6c483ad9761efa2"
+  },
+  "data/legal_references.json": {
+    "size": 3792,
+    "sha256": "f06b07261036a8e8e68069b51c4b50a3c8f0287a38d4fa3294d5926ba16fb817"
+  }
+}

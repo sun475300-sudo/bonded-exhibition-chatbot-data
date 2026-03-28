@@ -36,6 +36,7 @@ from src.kakao_adapter import (
     init_kakao_routes,
     parse_kakao_request,
 )
+from src.naver_adapter import NaverTalkTalkAdapter, EVENT_SEND, EVENT_OPEN
 from src.logger_db import ChatLogger
 from src.realtime_monitor import RealtimeMonitor
 from src.satisfaction_tracker import SatisfactionTracker
@@ -43,6 +44,7 @@ from src.security import APIKeyAuth, RateLimiter, sanitize_input
 from src.translator import SimpleTranslator
 from src.auth import JWTAuth, authenticate_user
 from src.law_updater import LawUpdateScheduler, LawVersionTracker, FAQUpdateNotifier
+from src.backup_manager import BackupManager
 from src.utils import load_json
 
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
@@ -89,6 +91,9 @@ jwt_auth = JWTAuth()
 law_version_tracker = LawVersionTracker()
 faq_update_notifier = FAQUpdateNotifier()
 law_update_scheduler = LawUpdateScheduler(law_version_tracker, faq_update_notifier)
+
+# 백업 관리자 초기화
+backup_manager = BackupManager()
 
 # --- FAQ in-memory cache ---
 _faq_cache: dict = {}
@@ -195,6 +200,21 @@ def internal_error(e):
 def index():
     """웹 챗봇 UI 페이지를 반환한다."""
     return send_from_directory(os.path.join(BASE_DIR, "web"), "index.html")
+
+
+@app.route("/docs")
+@app.route("/swagger")
+def swagger_ui():
+    """Swagger UI 페이지를 반환한다."""
+    return send_from_directory(os.path.join(BASE_DIR, "web"), "swagger.html")
+
+
+@app.route("/api/openapi.yaml")
+def openapi_spec():
+    """OpenAPI 명세 파일을 반환한다."""
+    return send_from_directory(
+        os.path.join(BASE_DIR, "docs"), "openapi.yaml", mimetype="text/yaml"
+    )
 
 
 @app.route("/manifest.json")
@@ -967,6 +987,175 @@ def admin_law_updates_acknowledge():
     except Exception as e:
         logger.error(f"알림 확인 처리 실패: {e}")
         return jsonify({"error": "알림 확인 처리 중 오류가 발생했습니다."}), 500
+
+
+@app.route("/api/admin/backup", methods=["POST"])
+@jwt_auth.require_auth()
+def admin_backup_create():
+    """수동 백업을 트리거한다."""
+    try:
+        backup_path = backup_manager.create_backup()
+        return jsonify({
+            "success": True,
+            "backup_path": backup_path,
+            "filename": os.path.basename(backup_path),
+        }), 201
+    except Exception as e:
+        logger.error(f"백업 생성 실패: {e}")
+        return jsonify({"error": "백업 생성 중 오류가 발생했습니다."}), 500
+
+
+@app.route("/api/admin/backups", methods=["GET"])
+@jwt_auth.require_auth()
+def admin_backup_list():
+    """사용 가능한 백업 목록을 반환한다."""
+    try:
+        backups = backup_manager.list_backups()
+        return jsonify({"backups": backups, "count": len(backups)})
+    except Exception as e:
+        logger.error(f"백업 목록 조회 실패: {e}")
+        return jsonify({"error": "백업 목록 조회 중 오류가 발생했습니다."}), 500
+
+
+@app.route("/api/admin/restore", methods=["POST"])
+@jwt_auth.require_auth()
+def admin_restore():
+    """특정 백업에서 복원한다."""
+    data = request.get_json(silent=True)
+    if not data or "filename" not in data:
+        return jsonify({"error": "filename 필드가 필요합니다."}), 400
+
+    filename = data["filename"]
+    backup_path = os.path.join(BASE_DIR, "backups", filename)
+
+    if not os.path.isfile(backup_path):
+        return jsonify({"error": "백업 파일을 찾을 수 없습니다."}), 404
+
+    try:
+        result = backup_manager.restore_from_backup(backup_path)
+        return jsonify({"success": True, **result})
+    except Exception as e:
+        logger.error(f"복원 실패: {e}")
+        return jsonify({"error": "복원 중 오류가 발생했습니다."}), 500
+
+
+@app.route("/api/admin/backup/<backup_id>", methods=["DELETE"])
+@jwt_auth.require_auth()
+def admin_backup_delete(backup_id):
+    """특정 백업을 삭제한다."""
+    backup_path = os.path.join(BASE_DIR, "backups", backup_id)
+
+    if not os.path.isfile(backup_path):
+        return jsonify({"error": "백업 파일을 찾을 수 없습니다."}), 404
+
+    try:
+        os.remove(backup_path)
+        enc_path = backup_path + ".enc"
+        if os.path.isfile(enc_path):
+            os.remove(enc_path)
+        return jsonify({"success": True, "deleted": backup_id})
+    except Exception as e:
+        logger.error(f"백업 삭제 실패: {e}")
+        return jsonify({"error": "백업 삭제 중 오류가 발생했습니다."}), 500
+
+
+# 네이버 톡톡 어댑터 인스턴스
+naver_adapter = NaverTalkTalkAdapter()
+
+NAVER_WELCOME_MESSAGE = (
+    "안녕하세요! 보세전시장 민원응대 챗봇입니다.\n\n"
+    "보세전시장에 관한 질문을 입력해 주세요.\n"
+    "예: 보세전시장이 무엇인가요?"
+)
+
+
+@app.route("/api/naver/webhook", methods=["POST"])
+def naver_webhook_post():
+    """네이버 톡톡 웹훅 수신 엔드포인트.
+
+    네이버 톡톡 웹훅 형식:
+    {
+        "event": "send",
+        "user": "유저식별값",
+        "textContent": {"text": "사용자 메시지"}
+    }
+
+    이벤트 타입별 처리:
+    - send: 사용자 메시지를 챗봇으로 처리하여 응답
+    - open: 환영 메시지 반환
+    - leave, friend: 200 OK 반환
+    """
+    data = request.get_json(silent=True)
+    if not data:
+        return jsonify({"success": True}), 200
+
+    parsed = naver_adapter.parse_webhook(data)
+    event = parsed["event"]
+    user_id = parsed["user_id"]
+
+    if event == EVENT_SEND:
+        text = parsed["text"]
+        if not text:
+            response = naver_adapter.build_response(event, {
+                "user_id": user_id,
+                "text": "질문을 입력해 주세요.\n\n예: 보세전시장이 무엇인가요?",
+            })
+            return jsonify(response), 200
+
+        # 챗봇 응답 생성
+        answer = chatbot.process_query(text)
+
+        # 바로가기 버튼 추가
+        buttons = [
+            {"label": "보세전시장이란?", "value": "보세전시장이란?"},
+            {"label": "물품 반입 절차", "value": "물품 반입 절차"},
+            {"label": "현장 판매 가능?", "value": "현장 판매 가능?"},
+            {"label": "문의처 안내", "value": "문의처 안내"},
+        ]
+
+        response = naver_adapter.build_response(event, {
+            "user_id": user_id,
+            "text": answer,
+            "buttons": buttons,
+        })
+
+        # 로깅
+        try:
+            categories = classify_query(text)
+            primary_category = categories[0] if categories else "GENERAL"
+            faq_match = chatbot.find_matching_faq(text, primary_category)
+            chat_logger.log_query(
+                query=text,
+                category=primary_category,
+                faq_id=faq_match.get("id") if faq_match else None,
+                is_escalation=False,
+                response_preview=answer[:200],
+            )
+        except Exception:
+            pass
+
+        return jsonify(response), 200
+
+    elif event == EVENT_OPEN:
+        response = naver_adapter.build_response(event, {
+            "user_id": user_id,
+            "text": NAVER_WELCOME_MESSAGE,
+        })
+        return jsonify(response), 200
+
+    # leave, friend 등 기타 이벤트는 200 OK 반환
+    return jsonify({"success": True}), 200
+
+
+@app.route("/api/naver/webhook", methods=["GET"])
+def naver_webhook_get():
+    """네이버 톡톡 웹훅 검증 엔드포인트.
+
+    네이버 톡톡이 웹훅 URL 등록 시 GET 요청으로 검증한다.
+    challenge 파라미터를 그대로 반환하여 인증을 완료한다.
+    """
+    challenge = request.args.get("challenge", "")
+    return challenge, 200
 
 
 def main():
