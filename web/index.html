@@ -464,6 +464,63 @@
     0%, 100% { box-shadow: 0 0 0 0 rgba(244, 67, 54, 0.4); }
     50% { box-shadow: 0 0 0 8px rgba(244, 67, 54, 0); }
   }
+
+  /* 자동완성 드롭다운 */
+  .autocomplete-wrapper {
+    position: relative;
+    flex: 1;
+  }
+  .autocomplete-wrapper input {
+    width: 100%;
+  }
+  #autocompleteDropdown {
+    display: none;
+    position: absolute;
+    bottom: 100%;
+    left: 0;
+    right: 0;
+    margin-bottom: 6px;
+    background: rgba(20, 32, 50, 0.98);
+    border: 1px solid rgba(100, 180, 255, 0.2);
+    border-radius: 10px;
+    overflow: hidden;
+    z-index: 200;
+    box-shadow: 0 -4px 20px rgba(0, 0, 0, 0.4);
+  }
+  #autocompleteDropdown.show { display: block; }
+  .ac-item {
+    padding: 10px 16px;
+    cursor: pointer;
+    transition: background 0.15s;
+    border-bottom: 1px solid rgba(100, 180, 255, 0.06);
+  }
+  .ac-item:last-child { border-bottom: none; }
+  .ac-item:hover, .ac-item.active {
+    background: rgba(33, 150, 243, 0.15);
+  }
+  .ac-item .ac-cat {
+    font-size: 10px;
+    font-weight: 600;
+    color: rgba(0, 188, 212, 0.8);
+    margin-bottom: 2px;
+    display: inline-block;
+    padding: 1px 6px;
+    background: rgba(0, 188, 212, 0.1);
+    border-radius: 3px;
+  }
+  .ac-item .ac-question {
+    font-size: 13px;
+    color: #b0c4d8;
+    line-height: 1.4;
+  }
+
+  /* 키워드 하이라이트 */
+  .msg.bot mark {
+    background: rgba(255, 213, 79, 0.25);
+    color: inherit;
+    padding: 0 2px;
+    border-radius: 2px;
+  }
 </style>
 </head>
 <body>
@@ -502,7 +559,10 @@
       </div>
     </div>
     <div class="input-area">
-      <input type="text" id="queryInput" placeholder="보세전시장에 대해 무엇이든 질문하세요..." autofocus>
+      <div class="autocomplete-wrapper">
+        <input type="text" id="queryInput" placeholder="보세전시장에 대해 무엇이든 질문하세요..." autofocus autocomplete="off">
+        <div id="autocompleteDropdown"></div>
+      </div>
       <button type="button" id="micBtn" onclick="toggleVoiceInput()" title="음성 입력">&#x1F3A4;</button>
       <button id="sendBtn" onclick="sendQuery()">전송</button>
     </div>
@@ -623,9 +683,13 @@ function askFaq(question) {
   sendQuery();
 }
 
+let lastUserQuery = '';
+
 async function sendQuery() {
   const query = queryInput.value.trim();
   if (!query) return;
+  lastUserQuery = query;
+  hideAutocomplete();
   addUserMessage(query);
   queryInput.value = '';
   sendBtn.disabled = true;
@@ -636,12 +700,13 @@ async function sendQuery() {
     const res = await fetch('/api/chat', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ query, lang: currentLang }),
+      body: JSON.stringify({ query, lang: currentLang, session_id: currentSessionId }),
     });
     const data = await res.json();
     if (data.error) {
       addBotMessage(data.error);
     } else {
+      if (data.session_id) currentSessionId = data.session_id;
       const catName = CATEGORY_NAMES[data.category] || data.category;
       addBotMessage(data.answer, catName, data.is_escalation);
     }
@@ -675,7 +740,11 @@ function addBotMessage(text, category, isEscalation, isWelcome) {
   if (isWelcome) {
     div.innerHTML = `<div style="font-size:14px;line-height:1.8">${escapeHtml(text)}</div>`;
   } else {
-    div.innerHTML = formatBotAnswer(text);
+    let html = formatBotAnswer(text);
+    if (lastUserQuery) {
+      html = highlightKeywords(html, lastUserQuery);
+    }
+    div.innerHTML = html;
   }
 
   if (isEscalation) {
@@ -745,6 +814,94 @@ function escapeHtml(str) {
     .replace(/\n/g, '<br>');
 }
 
+/* --- 키워드 하이라이트 --- */
+function highlightKeywords(html, query) {
+  const keywords = query.split(/\s+/).filter(w => w.length >= 2);
+  if (keywords.length === 0) return html;
+  const escaped = keywords.map(k => k.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'));
+  const pattern = new RegExp('(' + escaped.join('|') + ')', 'gi');
+  return html.replace(/>([^<]+)</g, (match, textContent) => {
+    return '>' + textContent.replace(pattern, '<mark>$1</mark>') + '<';
+  });
+}
+
+/* --- 자동완성 --- */
+const acDropdown = document.getElementById('autocompleteDropdown');
+let acDebounceTimer = null;
+let acActiveIndex = -1;
+let acSuggestions = [];
+
+function hideAutocomplete() {
+  acDropdown.classList.remove('show');
+  acDropdown.innerHTML = '';
+  acActiveIndex = -1;
+}
+
+function showAutocomplete(suggestions) {
+  if (suggestions.length === 0) { hideAutocomplete(); return; }
+  acActiveIndex = -1;
+  let html = '';
+  suggestions.forEach((s, i) => {
+    const catName = CATEGORY_NAMES[s.category] || s.category;
+    const escapedQ = s.question.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+    html += `<div class="ac-item" data-index="${i}" onmousedown="selectAutocomplete(${i})">
+      <div class="ac-cat">${catName}</div>
+      <div class="ac-question">${escapedQ}</div>
+    </div>`;
+  });
+  acDropdown.innerHTML = html;
+  acDropdown.classList.add('show');
+}
+
+function selectAutocomplete(index) {
+  if (acSuggestions[index]) {
+    queryInput.value = acSuggestions[index].question;
+    hideAutocomplete();
+    sendQuery();
+  }
+}
+
+queryInput.addEventListener('input', () => {
+  clearTimeout(acDebounceTimer);
+  const q = queryInput.value.trim();
+  if (!q) { hideAutocomplete(); return; }
+  acDebounceTimer = setTimeout(async () => {
+    try {
+      const res = await fetch('/api/autocomplete?q=' + encodeURIComponent(q));
+      const data = await res.json();
+      acSuggestions = data.suggestions || [];
+      if (queryInput.value.trim() === q) {
+        showAutocomplete(acSuggestions);
+      }
+    } catch (e) { hideAutocomplete(); }
+  }, 300);
+});
+
+queryInput.addEventListener('keydown', (e) => {
+  if (!acDropdown.classList.contains('show')) return;
+  const items = acDropdown.querySelectorAll('.ac-item');
+  if (items.length === 0) return;
+  if (e.key === 'ArrowDown') {
+    e.preventDefault();
+    acActiveIndex = Math.min(acActiveIndex + 1, items.length - 1);
+    items.forEach((el, i) => el.classList.toggle('active', i === acActiveIndex));
+  } else if (e.key === 'ArrowUp') {
+    e.preventDefault();
+    acActiveIndex = Math.max(acActiveIndex - 1, 0);
+    items.forEach((el, i) => el.classList.toggle('active', i === acActiveIndex));
+  } else if (e.key === 'Enter' && acActiveIndex >= 0) {
+    e.preventDefault();
+    e.stopImmediatePropagation();
+    selectAutocomplete(acActiveIndex);
+  } else if (e.key === 'Escape') {
+    hideAutocomplete();
+  }
+});
+
+document.addEventListener('click', (e) => {
+  if (!e.target.closest('.autocomplete-wrapper')) { hideAutocomplete(); }
+});
+
 function scrollToBottom() {
   messagesEl.scrollTop = messagesEl.scrollHeight;
 }
@@ -766,6 +923,154 @@ async function sendFeedback(queryId, rating, btn) {
 queryInput.addEventListener('keydown', (e) => {
   if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); sendQuery(); }
 });
+
+/* --- 대화 내보내기 --- */
+let currentSessionId = null;
+
+function toggleExportDropdown() {
+  const dd = document.getElementById('exportDropdown');
+  dd.classList.toggle('show');
+}
+
+// 드롭다운 외부 클릭 시 닫기
+document.addEventListener('click', (e) => {
+  const wrapper = document.querySelector('.export-wrapper');
+  if (wrapper && !wrapper.contains(e.target)) {
+    document.getElementById('exportDropdown').classList.remove('show');
+  }
+});
+
+function gatherMessagesFromDOM() {
+  const msgs = [];
+  const msgEls = document.querySelectorAll('.msg');
+  msgEls.forEach(el => {
+    const role = el.classList.contains('user') ? 'user' : 'bot';
+    // Get the first child div/element text for the message content
+    const contentEl = el.querySelector('.section-content, [style]');
+    let message = '';
+    if (contentEl) {
+      message = contentEl.textContent.trim();
+    } else {
+      // Fallback: get all text before the meta line
+      const clone = el.cloneNode(true);
+      const meta = clone.querySelector('.meta');
+      if (meta) meta.remove();
+      const fb = clone.querySelector('.feedback-area');
+      if (fb) fb.remove();
+      const fbThanks = clone.querySelector('.feedback-thanks');
+      if (fbThanks) fbThanks.remove();
+      const badge = clone.querySelector('.escalation-badge');
+      if (badge) badge.remove();
+      message = clone.textContent.trim();
+    }
+    const metaEl = el.querySelector('.meta');
+    const timestamp = metaEl ? metaEl.textContent.trim() : '';
+    msgs.push({ role, message, timestamp });
+  });
+  return msgs;
+}
+
+function generateClientExport(format, messages) {
+  const dateStr = new Date().toLocaleString('ko-KR');
+  if (format === 'text') {
+    const lines = ['보세전시장 챗봇 대화 기록', '날짜: ' + dateStr, '---'];
+    messages.forEach(m => {
+      const label = m.role === 'user' ? '[사용자]' : '[챗봇]';
+      lines.push(label + ' ' + m.message);
+    });
+    lines.push('---', '총 ' + messages.length + '개 대화');
+    return lines.join('\n');
+  }
+  if (format === 'json') {
+    return JSON.stringify({
+      export_date: dateStr,
+      messages_count: messages.length,
+      messages: messages
+    }, null, 2);
+  }
+  if (format === 'csv') {
+    const rows = [['role', 'message', 'timestamp'].join(',')];
+    messages.forEach(m => {
+      const escaped = m.message.replace(/"/g, '""');
+      rows.push([m.role, '"' + escaped + '"', m.timestamp].join(','));
+    });
+    return rows.join('\n');
+  }
+  if (format === 'html') {
+    const bubbles = messages.map(m => {
+      const cls = m.role === 'user' ? 'user' : 'bot';
+      const label = m.role === 'user' ? '사용자' : '챗봇';
+      const safe = m.message.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+      return '<div class="bubble ' + cls + '"><span class="label">' + label + '</span>' + safe + '</div>';
+    }).join('\n');
+    return '<!DOCTYPE html><html lang="ko"><head><meta charset="UTF-8"><title>대화 기록</title>' +
+      '<style>body{background:#1e1e1e;color:#e0e0e0;font-family:sans-serif;padding:20px}' +
+      '.bubble{padding:12px 16px;margin:8px 0;border-radius:12px;max-width:80%;line-height:1.5}' +
+      '.bubble .label{display:block;font-size:.75em;margin-bottom:4px;opacity:.7}' +
+      '.bubble.user{background:#2b5278;margin-left:auto;border-bottom-right-radius:4px}' +
+      '.bubble.bot{background:#333;margin-right:auto;border-bottom-left-radius:4px}' +
+      '</style></head><body><div style="max-width:700px;margin:0 auto">' +
+      '<h1 style="text-align:center;font-size:1.4em">보세전시장 챗봇 대화 기록</h1>' +
+      '<p style="text-align:center;color:#aaa">날짜: ' + dateStr + '</p>' +
+      bubbles +
+      '<p style="text-align:center;color:#aaa;border-top:1px solid #444;padding-top:10px;margin-top:20px">총 ' + messages.length + '개 대화</p>' +
+      '</div></body></html>';
+  }
+  return '';
+}
+
+function downloadFile(content, filename, mimeType) {
+  const blob = new Blob([content], { type: mimeType });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = filename;
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  URL.revokeObjectURL(url);
+}
+
+async function exportConversation(format) {
+  document.getElementById('exportDropdown').classList.remove('show');
+
+  const extMap = { text: 'txt', json: 'json', csv: 'csv', html: 'html' };
+  const mimeMap = { text: 'text/plain', json: 'application/json', csv: 'text/csv', html: 'text/html' };
+  const filename = 'conversation_export.' + extMap[format];
+
+  // Try server-side export if we have a session_id
+  if (currentSessionId) {
+    try {
+      const res = await fetch('/api/export', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ session_id: currentSessionId, format: format }),
+      });
+      if (res.ok) {
+        const blob = await res.blob();
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = filename;
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        URL.revokeObjectURL(url);
+        return;
+      }
+    } catch (e) {
+      // Fall through to client-side export
+    }
+  }
+
+  // Client-side fallback
+  const messages = gatherMessagesFromDOM();
+  if (messages.length === 0) {
+    return;
+  }
+  const content = generateClientExport(format, messages);
+  downloadFile(content, filename, mimeMap[format]);
+}
 
 init();
 </script>

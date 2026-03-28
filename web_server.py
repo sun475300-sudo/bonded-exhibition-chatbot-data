@@ -429,6 +429,140 @@ def admin_quality():
         return jsonify({"error": "품질 검사 중 오류가 발생했습니다."}), 500
 
 
+@app.route("/api/admin/realtime", methods=["GET"])
+def admin_realtime():
+    """실시간 모니터링 라이브 통계를 반환한다."""
+    try:
+        stats = realtime_monitor.get_live_stats()
+        alerts = realtime_monitor.get_alerts()
+
+        # Build hourly query counts for the last 24 hours
+        import time as _time
+        now = _time.time()
+        hourly_counts: list[dict] = []
+        with realtime_monitor._lock:
+            events = list(realtime_monitor._buffer)
+        for h in range(23, -1, -1):
+            start = now - (h + 1) * 3600
+            end = now - h * 3600
+            count = sum(
+                1 for e in events
+                if e["event_type"] in ("query", "unmatched")
+                and start <= e["timestamp"] < end
+            )
+            hour_label = _time.strftime("%H", _time.localtime(end))
+            hourly_counts.append({"hour": hour_label, "count": count})
+
+        return jsonify({
+            "queries_per_minute": stats["queries_last_minute"],
+            "avg_response_time_ms": stats["avg_response_time_ms"],
+            "active_sessions": stats["active_sessions"],
+            "error_rate": stats["error_rate"],
+            "unmatched_rate": stats["unmatched_rate"],
+            "queries_last_hour": stats["queries_last_hour"],
+            "top_categories": stats["top_categories"],
+            "alerts": alerts,
+            "hourly_counts": hourly_counts,
+        })
+    except Exception as e:
+        logger.error(f"실시간 모니터링 조회 실패: {e}")
+        return jsonify({"error": "실시간 모니터링 조회 중 오류가 발생했습니다."}), 500
+
+
+@app.route("/api/admin/faq-quality", methods=["GET"])
+def admin_faq_quality():
+    """FAQ 품질 대시보드 데이터를 반환한다."""
+    try:
+        result = faq_quality_checker.check_all()
+        # Enrich each issue with severity level
+        for issue in result.get("issues", []):
+            check_type = issue.get("check", "")
+            count = issue.get("count", 0)
+            if check_type == "duplicates" or (check_type == "keyword_coverage" and count > 5):
+                issue["severity"] = "critical"
+            elif count > 2:
+                issue["severity"] = "warning"
+            else:
+                issue["severity"] = "good"
+        return jsonify(result)
+    except Exception as e:
+        logger.error(f"FAQ 품질 대시보드 조회 실패: {e}")
+        return jsonify({"error": "FAQ 품질 대시보드 조회 중 오류가 발생했습니다."}), 500
+
+
+@app.route("/api/admin/satisfaction", methods=["GET"])
+def admin_satisfaction():
+    """만족도 트렌드 데이터를 반환한다."""
+    try:
+        stats = satisfaction_tracker.get_satisfaction_stats()
+        low_queries = satisfaction_tracker.get_low_satisfaction_queries(limit=10)
+
+        # Determine trend direction based on recent vs overall score
+        avg_score = stats.get("avg_satisfaction_score", 0.0)
+        if avg_score >= 0.7:
+            trend = "up"
+        elif avg_score >= 0.4:
+            trend = "stable"
+        else:
+            trend = "down"
+
+        return jsonify({
+            "overall_score": avg_score,
+            "trend": trend,
+            "total_queries": stats.get("total_queries", 0),
+            "re_ask_rate": stats.get("re_ask_rate", 0.0),
+            "response_type_distribution": stats.get("response_type_distribution", {}),
+            "lowest_rated": low_queries,
+        })
+    except Exception as e:
+        logger.error(f"만족도 트렌드 조회 실패: {e}")
+        return jsonify({"error": "만족도 트렌드 조회 중 오류가 발생했습니다."}), 500
+
+
+@app.route("/api/export", methods=["POST"])
+def export_conversation():
+    """대화 내역을 파일로 내보낸다.
+
+    요청 본문: {"session_id": "...", "format": "text|json|csv|html"}
+    """
+    data = request.get_json(silent=True)
+    if not data or "session_id" not in data:
+        return jsonify({"error": "session_id 필드가 필요합니다."}), 400
+
+    session_id = data["session_id"]
+    fmt = data.get("format", "text")
+    if fmt not in ("text", "json", "csv", "html"):
+        return jsonify({"error": "format은 text, json, csv, html 중 하나여야 합니다."}), 400
+
+    session = chatbot.session_manager.get_session(session_id)
+    if session is None:
+        return jsonify({"error": "세션을 찾을 수 없거나 만료되었습니다."}), 404
+
+    history = session.history
+
+    ext_map = {"text": "txt", "json": "json", "csv": "csv", "html": "html"}
+    mime_map = {
+        "text": "text/plain; charset=utf-8",
+        "json": "application/json",
+        "csv": "text/csv; charset=utf-8",
+        "html": "text/html; charset=utf-8",
+    }
+    filename = f"conversation_export.{ext_map[fmt]}"
+
+    if fmt == "json":
+        content = conversation_exporter.export_json(history, session_id)
+    elif fmt == "csv":
+        content = conversation_exporter.export_csv(history, session_id)
+    elif fmt == "html":
+        content = conversation_exporter.export_html(history, session_id)
+    else:
+        content = conversation_exporter.export_text(history, session_id)
+
+    resp = app.response_class(content, mimetype=mime_map[fmt])
+    resp.headers["Content-Disposition"] = f'attachment; filename="{filename}"'
+    return resp
+
+
 @app.route("/api/session/<session_id>/export", methods=["GET"])
 def session_export(session_id):
     """세션 대화를 내보낸다."""
