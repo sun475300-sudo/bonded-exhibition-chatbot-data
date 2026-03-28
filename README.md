@@ -11,12 +11,12 @@
 | FAQ | 50개 (v3.0.0) |
 | 질문 카테고리 | 10개 |
 | 에스컬레이션 규칙 | 5개 |
-| 테스트 | 631개 (전체 PASS) |
-| 소스 코드 | 7,436줄 (src/ + web_server + simulator) |
-| ��스트 코드 | 5,815줄 |
-| 소스 파일 | 37개 |
-| 테스트 파일 | 27개 |
-| 커밋 | 32개 |
+| 테스트 | 742개 (전체 PASS) |
+| 소스 코드 | 8,357줄 (src/ + web_server + simulator) |
+| 테스트 코드 | 7,750줄 |
+| 소스 파일 | 39개 |
+| 테스트 파일 | 33개 |
+| 커밋 | 34개 |
 
 ---
 
@@ -44,6 +44,10 @@
 | CD 파이프라인 | GitHub Actions, 블루/그린 배포, 자동 롤백 |
 | Prometheus | 요청 카운터, 히스토그램, 게이지 + Grafana 대시보드 |
 | Slack 알림 | 장애 알림, 일일 보고서, 웹훅 재시도 |
+| OpenAPI/Swagger | 35개 엔드포인트 문서화, Swagger UI |
+| 백업 자동화 | 증분 백업, 암호화, 복원 검증, 스케줄 |
+| 부하 테스트 | 6개 시나리오, 벤치마크, 성능 리포트 |
+| 네이버 톡톡 | 웹훅 어댑터, 캐러셀 카드, 복합 메시지 |
 
 ---
 
@@ -224,7 +228,7 @@ docker-compose up -d
 
 ### 테스트
 ```bash
-python -m pytest tests/ -v       # 631개 테스트 전체 PASS
+python -m pytest tests/ -v       # 742개 테스트 전체 PASS
 
 # 특정 모듈만
 python -m pytest tests/test_chatbot.py -v
@@ -285,8 +289,10 @@ bonded-exhibition-chatbot-data/
 │   ├── auth.py                    # JWT 인증 (HS256, 순수 Python)
 │   ├── metrics.py                 # Prometheus 메트릭 수집기
 │   ├── slack_notifier.py          # Slack 알림 (웹훅, 재시도)
+│   ├── backup_manager.py          # 백업/복구 (증분, 암호화, 스케줄)
+│   ├── naver_adapter.py           # 네이버 톡톡 어댑터
 │   └── utils.py                   # 유틸리티
-├── tests/                         # 631개 테스트
+├── tests/                         # 742개 테스트
 │   ├── test_chatbot.py            # 통합 테스트
 │   ├── test_classifier.py         # 분류기
 │   ├── test_similarity.py         # TF-IDF 매칭
@@ -313,17 +319,23 @@ bonded-exhibition-chatbot-data/
 │   ├── test_metrics.py            # Prometheus 메트릭 테스트
 │   ├── test_slack_notifier.py     # Slack 알림 테스트
 │   ├── test_law_updater.py        # 법령 업데이트 테스트
+│   ├── test_backup_manager.py     # 백업 매니저 테스트
+│   ├── test_naver_adapter.py      # 네이버 톡톡 테스트
+│   ├── test_openapi.py            # OpenAPI 스펙 테스트
+│   ├── test_benchmark.py          # 벤치마크 테스트
 │   └── test_web_api.py            # 웹 API
 ├── web/
 │   ├── index.html                 # 챗봇 UI (다크/라이트 테마, PWA, 음성, 접근성)
 │   ├── admin.html                 # 관리자 대시보드 (JWT 인증)
 │   ├── login.html                 # 관리자 로그인 페이지
+│   ├── swagger.html               # Swagger UI (API 문서)
 │   ├── manifest.json              # PWA 매니페스트
 │   ├── sw.js                      # 서비스 워커 (오프라인 캐싱)
 │   ├── icon-192.svg               # PWA 아이콘 (192x192)
 │   └── icon-512.svg               # PWA 아이콘 (512x512)
 ├── docs/
-│   ├── API.md                     # API 레퍼런스 (15+ 엔드포인트)
+│   ├── openapi.yaml               # OpenAPI 3.0 스펙 (35개 엔드포인트)
+│   ├── API.md                     # API 레퍼런스
 │   ├── OPERATIONS.md              # 운영 매뉴얼
 │   └── DEVELOPER.md               # 개발자 가이드
 ├── deploy/
@@ -440,6 +452,8 @@ timeline
         UX + 성능 : 타이핑이펙트, 테마토글, 접근성, 캐싱, 카카오톡
     section Phase 27-30
         엔터프라이즈 : JWT인증, 법령자동업데이트, CD파이프라인, Prometheus
+    section Phase 31-34
+        확장 + 품질 : OpenAPI, 백업자동화, 부하테스트, 네이버톡톡
 ```
 
 ## 업데이트 내역
@@ -453,6 +467,7 @@ timeline
 | v4.0.0 | Phase 13-18 (오타교정, BM25, 실시간모니터링, 품질검사, 플러그인) |
 | v5.0.0 | Phase 19-26 (타이핑이펙트, 테마토글, 접근성, 성능최적화, 카카오톡, 통합테스트) |
 | v6.0.0 | Phase 27-30 (JWT 인증, 법령 자동 업데이트, CD 파이프라인, Prometheus, Slack 알림) |
+| v7.0.0 | Phase 31-34 (OpenAPI/Swagger, 백업 자동화, 부하 테스트/벤치마크, 네이버 톡톡) |
 
 ## 기술 스택
 
