@@ -45,6 +45,9 @@ from src.translator import SimpleTranslator
 from src.auth import JWTAuth, authenticate_user
 from src.law_updater import LawUpdateScheduler, LawVersionTracker, FAQUpdateNotifier
 from src.backup_manager import BackupManager
+from src.faq_manager import FAQManager
+from src.tenant_manager import TenantManager
+from src.webhook_manager import WebhookManager
 from src.utils import load_json
 
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
@@ -94,6 +97,12 @@ law_update_scheduler = LawUpdateScheduler(law_version_tracker, faq_update_notifi
 
 # 백업 관리자 초기화
 backup_manager = BackupManager()
+
+# 웹훅 관리자 초기화
+webhook_manager = WebhookManager()
+
+# 멀티 테넌트 관리자 초기화
+tenant_manager = TenantManager()
 
 # --- FAQ in-memory cache ---
 _faq_cache: dict = {}
