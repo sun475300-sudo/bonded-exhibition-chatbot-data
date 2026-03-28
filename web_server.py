@@ -17,14 +17,18 @@ sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from flask import Flask, request, jsonify, send_from_directory
 from src.chatbot import BondedExhibitionChatbot
 from src.classifier import classify_query
+from src.conversation_export import ConversationExporter
 from src.escalation import check_escalation
 from src.analytics import QueryAnalytics
 from src.auto_faq_pipeline import AutoFAQPipeline
+from src.faq_quality_checker import FAQQualityChecker
 from src.faq_recommender import FAQRecommender
 from src.feedback import FeedbackManager
 from src.logger_db import ChatLogger
+from src.realtime_monitor import RealtimeMonitor
 from src.security import APIKeyAuth, RateLimiter, sanitize_input
 from src.translator import SimpleTranslator
+from src.utils import load_json
 
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 MAX_QUERY_LENGTH = 2000
@@ -55,6 +59,12 @@ auto_faq_pipeline = AutoFAQPipeline(
 api_key_auth = APIKeyAuth(app)
 rate_limit_value = int(os.environ.get("CHATBOT_RATE_LIMIT", "60"))
 rate_limiter = RateLimiter(max_requests=rate_limit_value)
+
+# Phase 13-18 모듈 초기화
+realtime_monitor = RealtimeMonitor()
+conversation_exporter = ConversationExporter()
+legal_refs = load_json("data/legal_references.json")
+faq_quality_checker = FAQQualityChecker(chatbot.faq_items, legal_refs)
 
 
 @app.errorhandler(400)
@@ -132,7 +142,7 @@ def chat():
     faq_match = chatbot.find_matching_faq(query, primary_category)
     faq_id = faq_match.get("id") if faq_match else None
 
-    # 로그 저장
+    # 로그 저장 + 모니터링 이벤트
     try:
         chat_logger.log_query(
             query=query,
@@ -141,6 +151,8 @@ def chat():
             is_escalation=is_escalation,
             response_preview=answer,
         )
+        event_type = "escalation" if is_escalation else ("query" if faq_match else "unmatched")
+        realtime_monitor.record_event(event_type, {"query": query, "category": primary_category})
     except Exception as e:
         logger.error(f"로그 저장 실패: {e}")
 
@@ -152,6 +164,14 @@ def chat():
         translated_answer = answer
         lang = "ko"
 
+    # 관련 질문 추천
+    related = []
+    if faq_id:
+        try:
+            related = chatbot.related_faq_finder.find_related(faq_id, top_k=3)
+        except Exception:
+            pass
+
     response = {
         "answer": translated_answer,
         "category": primary_category,
@@ -159,6 +179,7 @@ def chat():
         "is_escalation": is_escalation,
         "escalation_target": escalation.get("target") if escalation else None,
         "lang": lang,
+        "related_questions": [{"id": r["id"], "question": r["question"]} for r in related],
     }
 
     if session_id:
@@ -358,6 +379,65 @@ def admin_faq_reject():
     except Exception as e:
         logger.error(f"FAQ 후보 거부 실패: {e}")
         return jsonify({"error": "FAQ 후보 거부 중 오류가 발생했습니다."}), 500
+
+
+@app.route("/api/admin/monitor", methods=["GET"])
+def admin_monitor():
+    """실시간 모니터링 데이터를 반환한다."""
+    try:
+        stats = realtime_monitor.get_live_stats()
+        alerts = realtime_monitor.get_alerts()
+        return jsonify({"stats": stats, "alerts": alerts})
+    except Exception as e:
+        logger.error(f"모니터링 조회 실패: {e}")
+        return jsonify({"error": "모니터링 조회 중 오류가 발생했습니다."}), 500
+
+
+@app.route("/api/admin/quality", methods=["GET"])
+def admin_quality():
+    """FAQ 품질 검사 결과를 반환한다."""
+    try:
+        result = faq_quality_checker.check_all()
+        return jsonify(result)
+    except Exception as e:
+        logger.error(f"품질 검사 실패: {e}")
+        return jsonify({"error": "품질 검사 중 오류가 발생했습니다."}), 500
+
+
+@app.route("/api/session/<session_id>/export", methods=["GET"])
+def session_export(session_id):
+    """세션 대화를 내보낸다."""
+    session = chatbot.session_manager.get_session(session_id)
+    if session is None:
+        return jsonify({"error": "세션을 찾을 수 없습니다."}), 404
+
+    fmt = request.args.get("format", "text")
+    history = session.history
+
+    if fmt == "json":
+        content = conversation_exporter.export_json(history, session_id)
+        return app.response_class(content, mimetype="application/json")
+    elif fmt == "csv":
+        content = conversation_exporter.export_csv(history, session_id)
+        return app.response_class(content, mimetype="text/csv")
+    elif fmt == "html":
+        content = conversation_exporter.export_html(history, session_id)
+        return app.response_class(content, mimetype="text/html")
+    else:
+        content = conversation_exporter.export_text(history, session_id)
+        return app.response_class(content, mimetype="text/plain; charset=utf-8")
+
+
+@app.route("/api/related/<faq_id>", methods=["GET"])
+def related_faq(faq_id):
+    """관련 FAQ를 반환한다."""
+    top_k = request.args.get("top_k", 3, type=int)
+    try:
+        related = chatbot.related_faq_finder.find_related(faq_id, top_k=top_k)
+        return jsonify({"related": related, "count": len(related)})
+    except Exception as e:
+        logger.error(f"관련 FAQ 조회 실패: {e}")
+        return jsonify({"error": "관련 FAQ 조회 중 오류가 발생했습니다."}), 500
 
 
 def main():
