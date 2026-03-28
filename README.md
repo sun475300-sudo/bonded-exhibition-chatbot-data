@@ -11,9 +11,10 @@
 | FAQ | 50개 (v3.0.0) |
 | 질문 카테고리 | 10개 |
 | 에스컬레이션 규칙 | 5개 |
-| 테스트 | 187개 (전체 PASS) |
-| 소스 파일 | 28개 |
-| 커밋 | 15개 |
+| 테스트 | 422개 (전체 PASS) |
+| 소스 파일 | 22개 |
+| 테스트 파일 | 21개 |
+| 커밋 | 20개 |
 
 ---
 
@@ -180,7 +181,7 @@ docker-compose up -d
 
 ### 테스트
 ```bash
-python -m pytest tests/ -v       # 187개 테스트
+python -m pytest tests/ -v       # 422개 테스트
 ```
 
 ---
@@ -202,35 +203,64 @@ bonded-exhibition-chatbot-data/
 │   ├── chatbot.py                 # 메인 로직 (키워드+TF-IDF 하이브리드)
 │   ├── classifier.py              # 분류기 (10카테고리, 도메인 우선순위)
 │   ├── similarity.py              # TF-IDF 유사도 매칭 (순수 Python)
+│   ├── smart_classifier.py        # 스마트 분류기 (대화 맥락 인식)
 │   ├── session.py                 # 멀티턴 세션 관리 (30분 만료)
 │   ├── response_builder.py        # 답변 생성기 (면책 단일 관리)
 │   ├── escalation.py              # 에스컬레이션 (캐싱, normalize)
 │   ├── validator.py               # 확인 질문 (중복 방지)
 │   ├── logger_db.py               # SQLite 질문 로그
+│   ├── feedback.py                # 피드백 관리 (helpful/unhelpful)
+│   ├── security.py                # API Key 인증 + Rate Limiter
+│   ├── analytics.py               # 트렌드 분석 + 품질 점수
+│   ├── auto_faq_pipeline.py       # FAQ 자동 추천 파이프라인
+│   ├── faq_recommender.py         # 미매칭 클러스터링 → FAQ 후보
+│   ├── translator.py              # 다국어 (KO/EN/CN/JP)
+│   ├── config_manager.py          # 환경변수 → 설정 관리
 │   ├── data_validator.py          # 데이터 정합성 검증
 │   ├── kakao_adapter.py           # 카카오톡 어댑터
 │   ├── llm_fallback.py            # LLM 하이브리드 폴백
 │   ├── law_updater.py             # 법령 업데이트 감지
 │   └── utils.py                   # 유틸리티
-├── tests/                         # 187개 테스트
+├── tests/                         # 422개 테스트
 │   ├── test_chatbot.py            # 통합 테스트
 │   ├── test_classifier.py         # 분류기
 │   ├── test_similarity.py         # TF-IDF 매칭
+│   ├── test_smart_classifier.py   # 스마트 분류기
 │   ├── test_session.py            # 멀티턴 세션
 │   ├── test_response_builder.py   # 답변 생성기
 │   ├── test_escalation.py         # 에스컬레이션
 │   ├── test_validator.py          # 확인 질문
 │   ├── test_logger_db.py          # 로그 DB
+│   ├── test_feedback.py           # 피드백
+│   ├── test_security.py           # 보안
+│   ├── test_analytics.py          # 분석
+│   ├── test_auto_faq_pipeline.py  # FAQ 파이프라인
+│   ├── test_faq_recommender.py    # FAQ 추천
+│   ├── test_translator.py         # 다국어
+│   ├── test_config_manager.py     # 설정 관리
 │   ├── test_data_validator.py     # 데이터 정합성
 │   ├── test_edge_cases.py         # 에지케이스
+│   ├── test_e2e.py                # E2E + 회귀 + 부하
 │   └── test_web_api.py            # 웹 API
 ├── web/
 │   ├── index.html                 # 챗봇 UI (다크 테마)
 │   └── admin.html                 # 관리자 대시보드
-├── web_server.py                  # Flask 서버 (로깅, CORS, 에러핸들러)
+├── docs/
+│   ├── API.md                     # API 레퍼런스 (15+ 엔드포인트)
+│   ├── OPERATIONS.md              # 운영 매뉴얼
+│   └── DEVELOPER.md               # 개발자 가이드
+├── deploy/
+│   ├── nginx.conf                 # nginx 리버스 프록시
+│   ├── gunicorn_config.py         # gunicorn 설정
+│   ├── backup.sh                  # 백업 스크립트
+│   ├── restore.sh                 # 복원 스크립트
+│   └── healthcheck.py             # 헬스체크
+├── .github/workflows/ci.yml      # GitHub Actions CI/CD
+├── web_server.py                  # Flask 서버 (보안, 로깅, CORS)
 ├── simulator.py                   # 터미널 시뮬레이터
 ├── Dockerfile                     # Docker 이미지
 ├── docker-compose.yml             # Docker Compose
+├── CHANGELOG.md                   # 변경 이력
 └── requirements.txt               # flask, flask-cors, pytest
 ```
 
@@ -299,30 +329,26 @@ timeline
     title 프로젝트 개발 타임라인
     section 1차 구축
         시스템 구축 : FAQ 7개, 분류기, 답변생성기, 테스트 61개
-    section 버그 수정 R1
-        버그 6건 수정 : 에스컬레이션 우선순위, 분류기 오타, FAQ 동점 등
-    section 확장
-        FAQ 29개 확장 : 빈 카테고리 보충, 웹 UI 구축
-    section 대규모 스캔
-        16건 수정 : 분류기, 에스컬레이션, FAQ 변별력
-    section 정밀 분석
-        20건 발견·수정 : 정규화 불일치, dead code, 보안 등
+    section 버그 수정
+        22건 수정 : 에스컬레이션, 분류기, FAQ 동점, 정규화 등
     section Phase 1-3
-        9개 기능 구현 : 멀티턴, TF-IDF, Docker, 로그DB, 대시보드, FAQ 50개
+        9개 기능 : 멀티턴, TF-IDF, Docker, 로그DB, 대시보드, FAQ 50개
+    section Phase 4-6
+        지능화 + 플랫폼 : SmartClassifier, 피드백, CI/CD, PWA, 음성, 다국어
+    section Phase 7-9
+        보안 + 프로덕션 : API Key, Rate Limit, 분석, nginx, gunicorn
+    section Phase 10-12
+        품질 완성 : E2E 테스트, 회귀 16건, 부하, 문서화, UX
 ```
 
 ## 업데이트 내역
 
-| 커밋 | 내용 |
+| 버전 | 주요 내용 |
 |------|------|
-| `446d9a2` | feat: 챗봇 전체 시스템 구축 |
-| `853bea3` | feat: FAQ 29개 확장, 분류기 강화 |
-| `eb591f3` | feat: 웹 챗봇 인터페이스 구축 |
-| `a02838f` | fix: FAQ 매칭 버그 + 웹 UI 개선 |
-| `95d9eba` | fix: 대규모 버그 스캔 16건 |
-| `4796ba6` | refactor: 정밀 분석 20건 전체 수정 |
-| `a2aba9b` | feat: Phase 1-3 전체 구현 (멀티턴, Docker, 로그DB, 대시보드 등) |
-| `e3780c6` | feat: FAQ 50개 확장 + TF-IDF 폴백 통합 |
+| v1.0.0 | 챗봇 구축 (FAQ 7개, 분류기, 답변생성기, 에스컬레이션) |
+| v1.x | 버그 22건 수정 (분류기, FAQ 매칭, 정규화 등) |
+| v2.0.0 | Phase 1-6 (멀티턴, TF-IDF, Docker, SmartClassifier, PWA, 다국어) |
+| v3.0.0 | Phase 7-12 (보안, 분석, 프로덕션, E2E 테스트, 문서화, UX) |
 
 ## 라이선스
 
