@@ -451,8 +451,53 @@ def chat():
 
     if session_id:
         response["session_id"] = session_id
+        # 개인화 추천 추가
+        try:
+            recommended = user_recommender.get_recommendations(session_id, top_n=3)
+            response["recommended"] = recommended
+        except Exception:
+            response["recommended"] = []
 
     return jsonify(response)
+
+
+@app.route("/api/recommendations", methods=["GET"])
+def api_recommendations():
+    """개인화 FAQ 추천을 반환한다."""
+    session_id = request.args.get("session_id")
+    if not session_id:
+        return jsonify({"error": "session_id 파라미터가 필요합니다."}), 400
+    try:
+        recommendations = user_recommender.get_recommendations(session_id)
+        return jsonify({"session_id": session_id, "recommendations": recommendations})
+    except Exception as e:
+        logger.error(f"추천 조회 실패: {e}")
+        return jsonify({"error": "추천 조회 중 오류가 발생했습니다."}), 500
+
+
+@app.route("/api/popular", methods=["GET"])
+def api_popular():
+    """전체 인기 FAQ를 반환한다."""
+    try:
+        limit = request.args.get("limit", 10, type=int)
+        popular = user_recommender.get_popular_faqs(limit=limit)
+        return jsonify({"popular": popular})
+    except Exception as e:
+        logger.error(f"인기 FAQ 조회 실패: {e}")
+        return jsonify({"error": "인기 FAQ 조회 중 오류가 발생했습니다."}), 500
+
+
+@app.route("/api/trending", methods=["GET"])
+def api_trending():
+    """트렌딩 토픽을 반환한다."""
+    try:
+        hours = request.args.get("hours", 24, type=int)
+        limit = request.args.get("limit", 5, type=int)
+        trending = user_recommender.get_trending_topics(hours=hours, limit=limit)
+        return jsonify({"trending": trending})
+    except Exception as e:
+        logger.error(f"트렌딩 조회 실패: {e}")
+        return jsonify({"error": "트렌딩 조회 중 오류가 발생했습니다."}), 500
 
 
 @app.route("/api/session/new", methods=["POST"])
@@ -1666,6 +1711,144 @@ def _reload_chatbot_faq():
 
 
 
+# --- FAQ Import/Export endpoints ---
+
+@app.route("/api/admin/faq/import", methods=["POST"])
+@jwt_auth.require_auth()
+def admin_faq_import():
+    """Upload a CSV or JSON file and import FAQ items."""
+    if "file" not in request.files:
+        return jsonify({"error": "No file provided"}), 400
+
+    file = request.files["file"]
+    if not file.filename:
+        return jsonify({"error": "No file selected"}), 400
+
+    strategy = request.form.get("strategy", "skip")
+    fmt = request.form.get("format", "")
+    if not fmt:
+        if file.filename.endswith(".json"):
+            fmt = "json"
+        else:
+            fmt = "csv"
+
+    import tempfile as _tempfile
+    tmp_dir = os.path.join(BASE_DIR, "logs")
+    os.makedirs(tmp_dir, exist_ok=True)
+    suffix = ".json" if fmt == "json" else ".csv"
+    fd, tmp_path = _tempfile.mkstemp(dir=tmp_dir, suffix=suffix)
+    try:
+        file.save(tmp_path)
+        os.close(fd)
+
+        if fmt == "json":
+            items = faq_importer.import_json(tmp_path)
+        else:
+            items = faq_importer.import_csv(tmp_path)
+
+        result = faq_importer.merge_import(items, strategy=strategy)
+        _reload_chatbot_faq()
+
+        try:
+            audit_logger.log(
+                actor=_get_audit_actor(), action="import", resource_type="faq",
+                details={"format": fmt, "strategy": strategy, **{k: v for k, v in result.items() if k != "errors"}},
+                ip=_get_client_ip(),
+            )
+        except Exception:
+            pass
+
+        return jsonify({"success": True, **result})
+    except ValueError as e:
+        return jsonify({"error": str(e)}), 400
+    except Exception as e:
+        logger.error(f"FAQ import failed: {e}")
+        return jsonify({"error": "FAQ import failed"}), 500
+    finally:
+        try:
+            os.unlink(tmp_path)
+        except OSError:
+            pass
+
+
+@app.route("/api/admin/faq/import/preview", methods=["POST"])
+@jwt_auth.require_auth()
+def admin_faq_import_preview():
+    """Preview a file import without applying changes."""
+    if "file" not in request.files:
+        return jsonify({"error": "No file provided"}), 400
+
+    file = request.files["file"]
+    if not file.filename:
+        return jsonify({"error": "No file selected"}), 400
+
+    fmt = request.form.get("format", "")
+    if not fmt:
+        if file.filename.endswith(".json"):
+            fmt = "json"
+        else:
+            fmt = "csv"
+
+    import tempfile as _tempfile
+    tmp_dir = os.path.join(BASE_DIR, "logs")
+    os.makedirs(tmp_dir, exist_ok=True)
+    suffix = ".json" if fmt == "json" else ".csv"
+    fd, tmp_path = _tempfile.mkstemp(dir=tmp_dir, suffix=suffix)
+    try:
+        file.save(tmp_path)
+        os.close(fd)
+        preview = faq_importer.preview_import(tmp_path, format=fmt)
+        return jsonify(preview)
+    except Exception as e:
+        logger.error(f"FAQ import preview failed: {e}")
+        return jsonify({"error": "Preview failed"}), 500
+    finally:
+        try:
+            os.unlink(tmp_path)
+        except OSError:
+            pass
+
+
+@app.route("/api/admin/faq/export", methods=["GET"])
+@jwt_auth.require_auth()
+def admin_faq_export():
+    """Export FAQ items as a downloadable CSV or JSON file."""
+    fmt = request.args.get("format", "csv").lower()
+
+    import tempfile as _tempfile
+    tmp_dir = os.path.join(BASE_DIR, "logs")
+    os.makedirs(tmp_dir, exist_ok=True)
+
+    try:
+        if fmt == "json":
+            fd, tmp_path = _tempfile.mkstemp(dir=tmp_dir, suffix=".json")
+            os.close(fd)
+            faq_exporter.export_json(tmp_path)
+            with open(tmp_path, "r", encoding="utf-8") as f:
+                content = f.read()
+            os.unlink(tmp_path)
+            return Response(
+                content,
+                mimetype="application/json",
+                headers={"Content-Disposition": "attachment; filename=faq_export.json"},
+            )
+        else:
+            fd, tmp_path = _tempfile.mkstemp(dir=tmp_dir, suffix=".csv")
+            os.close(fd)
+            faq_exporter.export_csv(tmp_path)
+            with open(tmp_path, "r", encoding="utf-8") as f:
+                content = f.read()
+            os.unlink(tmp_path)
+            return Response(
+                content,
+                mimetype="text/csv",
+                headers={"Content-Disposition": "attachment; filename=faq_export.csv"},
+            )
+    except Exception as e:
+        logger.error(f"FAQ export failed: {e}")
+        return jsonify({"error": "FAQ export failed"}), 500
+
+
 # --- Webhook API endpoints ---
 
 @app.route("/api/admin/webhooks", methods=["POST"])
@@ -2151,6 +2334,85 @@ def admin_health_components():
 def health_dashboard():
     """헬스 모니터링 대시보드 페이지를 반환한다."""
     return send_from_directory(os.path.join(BASE_DIR, "web"), "health.html")
+
+
+# ── A/B Testing API ──────────────────────────────────────────────────────
+
+@app.route("/api/admin/ab-tests", methods=["POST"])
+@jwt_auth.require_auth()
+def create_ab_test():
+    """A/B 테스트를 생성한다."""
+    data = request.get_json(silent=True)
+    if not data:
+        return jsonify({"error": "요청 본문이 필요합니다."}), 400
+
+    name = data.get("name")
+    faq_id = data.get("faq_id")
+    variants = data.get("variants")
+
+    try:
+        result = ab_test_manager.create_test(name, faq_id, variants)
+        return jsonify(result), 201
+    except ValueError as e:
+        return jsonify({"error": str(e)}), 400
+    except Exception as e:
+        logger.error(f"A/B 테스트 생성 실패: {e}")
+        return jsonify({"error": "A/B 테스트 생성 중 오류가 발생했습니다."}), 500
+
+
+@app.route("/api/admin/ab-tests", methods=["GET"])
+@jwt_auth.require_auth()
+def list_ab_tests():
+    """A/B 테스트 목록을 반환한다."""
+    active_only = request.args.get("active_only", "true").lower() == "true"
+    try:
+        tests = ab_test_manager.list_tests(active_only=active_only)
+        return jsonify({"tests": tests, "count": len(tests)})
+    except Exception as e:
+        logger.error(f"A/B 테스트 목록 조회 실패: {e}")
+        return jsonify({"error": "A/B 테스트 목록 조회 중 오류가 발생했습니다."}), 500
+
+
+@app.route("/api/admin/ab-tests/<test_id>/results", methods=["GET"])
+@jwt_auth.require_auth()
+def get_ab_test_results(test_id):
+    """A/B 테스트 결과를 반환한다."""
+    try:
+        results = ab_test_manager.get_results(test_id)
+        if not results:
+            return jsonify({"error": "테스트를 찾을 수 없습니다."}), 404
+        return jsonify(results)
+    except Exception as e:
+        logger.error(f"A/B 테스트 결과 조회 실패: {e}")
+        return jsonify({"error": "A/B 테스트 결과 조회 중 오류가 발생했습니다."}), 500
+
+
+@app.route("/api/admin/ab-tests/<test_id>/stop", methods=["POST"])
+@jwt_auth.require_auth()
+def stop_ab_test(test_id):
+    """A/B 테스트를 중지한다."""
+    try:
+        stopped = ab_test_manager.stop_test(test_id)
+        if not stopped:
+            return jsonify({"error": "활성 테스트를 찾을 수 없습니다."}), 404
+        return jsonify({"success": True, "test_id": test_id})
+    except Exception as e:
+        logger.error(f"A/B 테스트 중지 실패: {e}")
+        return jsonify({"error": "A/B 테스트 중지 중 오류가 발생했습니다."}), 500
+
+
+@app.route("/api/admin/ab-tests/<test_id>/apply-winner", methods=["POST"])
+@jwt_auth.require_auth()
+def apply_ab_test_winner(test_id):
+    """A/B 테스트 우승 변형을 FAQ에 적용한다."""
+    try:
+        result = ab_test_manager.apply_winner(test_id)
+        return jsonify(result)
+    except ValueError as e:
+        return jsonify({"error": str(e)}), 400
+    except Exception as e:
+        logger.error(f"A/B 테스트 우승 적용 실패: {e}")
+        return jsonify({"error": "A/B 테스트 우승 적용 중 오류가 발생했습니다."}), 500
 
 
 def main():
