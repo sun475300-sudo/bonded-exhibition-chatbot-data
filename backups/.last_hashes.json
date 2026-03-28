@@ -21,10 +21,10 @@
   },
   "data/tenants.db": {
     "size": 12288,
-    "sha256": "8c05def4dc2eba236c356a5d5b9a2101a9b4884a6ba33273cac0f18cff6c9670"
+    "sha256": "7e3de7294cc959d01e2164f2a833f7c1d9ca4c123497d506272dc75d228f5328"
   },
   "data/webhooks.db": {
-    "size": 28672,
-    "sha256": "1671d56f36a44ff5b3d9aaa2b4357a589acbc80d774ff51f1782bf6e594268bd"
+    "size": 36864,
+    "sha256": "79fa6892d67a7fe3bf2f49f8cb0e6512591859a3794ac2a469a5723bb361e009"
   }
 }

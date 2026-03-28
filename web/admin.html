@@ -620,6 +620,49 @@
                 <div class="loading">로딩 중...</div>
             </div>
         </div>
+
+        <!-- 리포트 생성 섹션 -->
+        <div class="section-title">리포트 생성</div>
+
+        <div class="panel">
+            <h2>분석 리포트 생성</h2>
+            <p class="hint">일별/주별/월별 분석 리포트를 생성하고 HTML로 다운로드할 수 있습니다.</p>
+
+            <div style="display:flex;gap:1rem;flex-wrap:wrap;margin-top:1rem;align-items:flex-end;">
+                <div>
+                    <label style="font-size:0.85rem;color:#555;display:block;margin-bottom:4px;">리포트 타입</label>
+                    <select id="reportType" style="padding:0.4rem 0.8rem;border:1px solid #ddd;border-radius:4px;font-size:0.85rem;" onchange="toggleReportInputs()">
+                        <option value="daily">일별 (Daily)</option>
+                        <option value="weekly">주별 (Weekly)</option>
+                        <option value="monthly">월별 (Monthly)</option>
+                    </select>
+                </div>
+                <div id="reportDateGroup">
+                    <label style="font-size:0.85rem;color:#555;display:block;margin-bottom:4px;">날짜</label>
+                    <input type="date" id="reportDate" style="padding:0.4rem 0.8rem;border:1px solid #ddd;border-radius:4px;font-size:0.85rem;">
+                </div>
+                <div id="reportYearMonthGroup" style="display:none;">
+                    <label style="font-size:0.85rem;color:#555;display:block;margin-bottom:4px;">연/월</label>
+                    <input type="month" id="reportYearMonth" style="padding:0.4rem 0.8rem;border:1px solid #ddd;border-radius:4px;font-size:0.85rem;">
+                </div>
+                <button class="btn btn-approve" onclick="generateReport()">리포트 생성</button>
+                <button class="btn" style="background:#3498db;color:#fff;" onclick="downloadReportHtml()">HTML 다운로드</button>
+            </div>
+
+            <!-- 리포트 미리보기 -->
+            <div id="reportPreview" style="margin-top:1.5rem;display:none;">
+                <h3 style="font-size:1rem;color:#1a3a5c;margin-bottom:0.8rem;">리포트 미리보기</h3>
+                <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:0.8rem;margin-bottom:1rem;">
+                    <div class="realtime-stat"><div class="rt-label">총 질문 수</div><div class="rt-value" id="rpTotalQueries">-</div></div>
+                    <div class="realtime-stat"><div class="rt-label">세션 수</div><div class="rt-value" id="rpSessions">-</div></div>
+                    <div class="realtime-stat"><div class="rt-label">평균 질문/세션</div><div class="rt-value" id="rpAvgQps">-</div></div>
+                    <div class="realtime-stat"><div class="rt-label">에스컬레이션</div><div class="rt-value" id="rpEscRate">-</div></div>
+                    <div class="realtime-stat"><div class="rt-label">매칭률</div><div class="rt-value" id="rpMatchRate">-</div></div>
+                    <div class="realtime-stat"><div class="rt-label">만족도</div><div class="rt-value" id="rpSatisfaction">-</div></div>
+                </div>
+                <div id="rpCategoryBars"></div>
+            </div>
+        </div>
     </div>
 
     <script>
@@ -1136,6 +1179,95 @@
             } catch (e) {
                 console.error("만족도 트렌드 로딩 실패:", e);
             }
+        }
+
+        // --- 리포트 생성 관련 ---
+        function toggleReportInputs() {
+            const type = document.getElementById("reportType").value;
+            document.getElementById("reportDateGroup").style.display = (type === "monthly") ? "none" : "";
+            document.getElementById("reportYearMonthGroup").style.display = (type === "monthly") ? "" : "none";
+        }
+
+        function getReportParams() {
+            const type = document.getElementById("reportType").value;
+            if (type === "daily") {
+                const date = document.getElementById("reportDate").value;
+                return date ? "type=daily&date=" + date : "type=daily";
+            } else if (type === "weekly") {
+                const date = document.getElementById("reportDate").value;
+                return date ? "type=weekly&start=" + date : "type=weekly";
+            } else {
+                const ym = document.getElementById("reportYearMonth").value;
+                if (ym) {
+                    const parts = ym.split("-");
+                    return "type=monthly&year=" + parts[0] + "&month=" + parseInt(parts[1]);
+                }
+                return "type=monthly";
+            }
+        }
+
+        function getReportApiUrl() {
+            const type = document.getElementById("reportType").value;
+            if (type === "daily") {
+                const date = document.getElementById("reportDate").value;
+                return "/api/admin/reports/daily" + (date ? "?date=" + date : "");
+            } else if (type === "weekly") {
+                const date = document.getElementById("reportDate").value;
+                return "/api/admin/reports/weekly" + (date ? "?start=" + date : "");
+            } else {
+                const ym = document.getElementById("reportYearMonth").value;
+                if (ym) {
+                    const parts = ym.split("-");
+                    return "/api/admin/reports/monthly?year=" + parts[0] + "&month=" + parseInt(parts[1]);
+                }
+                return null;
+            }
+        }
+
+        async function generateReport() {
+            const url = getReportApiUrl();
+            if (!url) {
+                alert("연/월을 선택해 주세요.");
+                return;
+            }
+            try {
+                const res = await authFetch(url);
+                if (!res.ok) { alert("리포트 생성 실패"); return; }
+                const data = await res.json();
+                const preview = document.getElementById("reportPreview");
+                preview.style.display = "";
+                document.getElementById("rpTotalQueries").textContent = data.total_queries || 0;
+                document.getElementById("rpSessions").textContent = data.unique_sessions || 0;
+                document.getElementById("rpAvgQps").textContent = data.avg_queries_per_session || 0;
+                document.getElementById("rpEscRate").textContent = (data.escalation_rate || 0) + "%";
+                const mr = data.match_rate || {};
+                document.getElementById("rpMatchRate").textContent = (mr.matched_rate || 0) + "%";
+                const sat = data.satisfaction;
+                document.getElementById("rpSatisfaction").textContent = sat ? sat.helpful_rate + "%" : "N/A";
+
+                // Category bars
+                const cats = data.category_distribution || [];
+                const maxC = Math.max(...cats.map(c => c.count), 1);
+                document.getElementById("rpCategoryBars").innerHTML = cats.map(c => {
+                    const pct = (c.count / maxC) * 100;
+                    return '<div class="bar-row"><span class="bar-label">' + escapeHtml(c.category) + '</span>' +
+                        '<div class="bar-track"><div class="bar-fill" style="width:' + pct + '%"></div></div>' +
+                        '<span class="bar-count">' + c.count + '</span></div>';
+                }).join("");
+            } catch(e) {
+                console.error("리포트 생성 실패:", e);
+                alert("리포트 생성 중 오류가 발생했습니다.");
+            }
+        }
+
+        function downloadReportHtml() {
+            const params = getReportParams();
+            if (params.includes("type=monthly") && !params.includes("year=")) {
+                alert("연/월을 선택해 주세요.");
+                return;
+            }
+            const token = getToken();
+            window.open("/api/admin/reports/html?" + params + "&token=" + encodeURIComponent(token || ""), "_blank");
         }
 
         // 초기 로딩

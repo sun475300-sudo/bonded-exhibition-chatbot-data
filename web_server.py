@@ -589,6 +589,92 @@ def admin_report():
         return jsonify({"error": "주간 리포트 생성 중 오류가 발생했습니다."}), 500
 
 
+@app.route("/api/admin/reports/daily", methods=["GET"])
+@jwt_auth.require_auth()
+def admin_report_daily():
+    """일별 리포트 JSON을 반환한다."""
+    try:
+        date = request.args.get("date", None)
+        report_data = report_generator.generate_daily_report(date=date)
+        return jsonify(report_data)
+    except Exception as e:
+        logger.error(f"일별 리포트 생성 실패: {e}")
+        return jsonify({"error": "일별 리포트 생성 중 오류가 발생했습니다."}), 500
+
+
+@app.route("/api/admin/reports/weekly", methods=["GET"])
+@jwt_auth.require_auth()
+def admin_report_weekly():
+    """주별 리포트 JSON을 반환한다."""
+    try:
+        start = request.args.get("start", None)
+        report_data = report_generator.generate_weekly_report(week_start=start)
+        return jsonify(report_data)
+    except Exception as e:
+        logger.error(f"주별 리포트 생성 실패: {e}")
+        return jsonify({"error": "주별 리포트 생성 중 오류가 발생했습니다."}), 500
+
+
+@app.route("/api/admin/reports/monthly", methods=["GET"])
+@jwt_auth.require_auth()
+def admin_report_monthly():
+    """월별 리포트 JSON을 반환한다."""
+    try:
+        year = request.args.get("year", type=int)
+        month = request.args.get("month", type=int)
+        if not year or not month:
+            return jsonify({"error": "year와 month 파라미터가 필요합니다."}), 400
+        if month < 1 or month > 12:
+            return jsonify({"error": "month는 1-12 사이여야 합니다."}), 400
+        report_data = report_generator.generate_monthly_report(year, month)
+        return jsonify(report_data)
+    except Exception as e:
+        logger.error(f"월별 리포트 생성 실패: {e}")
+        return jsonify({"error": "월별 리포트 생성 중 오류가 발생했습니다."}), 500
+
+
+@app.route("/api/admin/reports/html", methods=["GET"])
+@jwt_auth.require_auth()
+def admin_report_html():
+    """HTML 리포트 파일을 다운로드한다."""
+    import tempfile
+    try:
+        report_type = request.args.get("type", "daily")
+        if report_type == "daily":
+            date = request.args.get("date", None)
+            report_data = report_generator.generate_daily_report(date=date)
+        elif report_type == "weekly":
+            start = request.args.get("start", None)
+            report_data = report_generator.generate_weekly_report(week_start=start)
+        elif report_type == "monthly":
+            year = request.args.get("year", type=int)
+            month = request.args.get("month", type=int)
+            if not year or not month:
+                return jsonify({"error": "year와 month 파라미터가 필요합니다."}), 400
+            report_data = report_generator.generate_monthly_report(year, month)
+        else:
+            return jsonify({"error": "유효하지 않은 리포트 타입입니다."}), 400
+
+        tmp = tempfile.NamedTemporaryFile(
+            suffix=".html", delete=False, dir=os.path.join(BASE_DIR, "logs")
+        )
+        tmp.close()
+        report_generator.export_html(report_data, tmp.name)
+        with open(tmp.name, "r", encoding="utf-8") as f:
+            html_content = f.read()
+        os.unlink(tmp.name)
+
+        filename = f"report_{report_type}_{report_data.get('start_date', 'unknown')}.html"
+        return Response(
+            html_content,
+            mimetype="text/html",
+            headers={"Content-Disposition": f"attachment; filename={filename}"},
+        )
+    except Exception as e:
+        logger.error(f"HTML 리포트 생성 실패: {e}")
+        return jsonify({"error": "HTML 리포트 생성 중 오류가 발생했습니다."}), 500
+
+
 @app.route("/api/admin/faq-pipeline", methods=["GET"])
 @jwt_auth.require_auth()
 def admin_faq_pipeline():
@@ -1179,6 +1265,297 @@ def naver_webhook_get():
     """
     challenge = request.args.get("challenge", "")
     return challenge, 200
+
+
+# --- 멀티 테넌트 관리 API ---
+
+
+@app.route("/api/admin/tenants", methods=["GET"])
+@jwt_auth.require_auth()
+def admin_list_tenants():
+    """테넌트 목록을 반환한다."""
+    try:
+        tenants = tenant_manager.list_tenants()
+        return jsonify({"tenants": tenants, "count": len(tenants)})
+    except Exception as e:
+        logger.error(f"테넌트 목록 조회 실패: {e}")
+        return jsonify({"error": "테넌트 목록 조회 중 오류가 발생했습니다."}), 500
+
+
+@app.route("/api/admin/tenants", methods=["POST"])
+@jwt_auth.require_auth()
+def admin_create_tenant():
+    """새 테넌트를 생성한다."""
+    data = request.get_json(silent=True)
+    if not data or "tenant_id" not in data or "name" not in data:
+        return jsonify({"error": "tenant_id와 name 필드가 필요합니다."}), 400
+
+    try:
+        tenant = tenant_manager.create_tenant(
+            tenant_id=data["tenant_id"],
+            name=data["name"],
+            config=data.get("config"),
+        )
+        return jsonify({"success": True, "tenant": tenant}), 201
+    except ValueError as e:
+        return jsonify({"error": str(e)}), 400
+    except Exception as e:
+        logger.error(f"테넌트 생성 실패: {e}")
+        return jsonify({"error": "테넌트 생성 중 오류가 발생했습니다."}), 500
+
+
+@app.route("/api/admin/tenants/<tenant_id>", methods=["PUT"])
+@jwt_auth.require_auth()
+def admin_update_tenant(tenant_id):
+    """테넌트 설정을 업데이트한다."""
+    data = request.get_json(silent=True)
+    if not data:
+        return jsonify({"error": "업데이트할 데이터가 필요합니다."}), 400
+
+    try:
+        tenant = tenant_manager.update_tenant(tenant_id, data)
+        return jsonify({"success": True, "tenant": tenant})
+    except ValueError as e:
+        return jsonify({"error": str(e)}), 404
+    except Exception as e:
+        logger.error(f"테넌트 업데이트 실패: {e}")
+        return jsonify({"error": "테넌트 업데이트 중 오류가 발생했습니다."}), 500
+
+
+@app.route("/api/admin/tenants/<tenant_id>", methods=["DELETE"])
+@jwt_auth.require_auth()
+def admin_delete_tenant(tenant_id):
+    """테넌트를 삭제한다."""
+    try:
+        tenant_manager.delete_tenant(tenant_id)
+        return jsonify({"success": True})
+    except ValueError as e:
+        return jsonify({"error": str(e)}), 400
+    except Exception as e:
+        logger.error(f"테넌트 삭제 실패: {e}")
+        return jsonify({"error": "테넌트 삭제 중 오류가 발생했습니다."}), 500
+
+
+@app.route("/api/admin/tenants/<tenant_id>/faq", methods=["GET"])
+@jwt_auth.require_auth()
+def admin_tenant_faq(tenant_id):
+    """테넌트별 FAQ 데이터를 반환한다."""
+    try:
+        faq = tenant_manager.get_tenant_faq(tenant_id)
+        return jsonify(faq)
+    except ValueError as e:
+        return jsonify({"error": str(e)}), 404
+    except Exception as e:
+        logger.error(f"테넌트 FAQ 조회 실패: {e}")
+        return jsonify({"error": "테넌트 FAQ 조회 중 오류가 발생했습니다."}), 500
+
+
+
+# --- FAQ Manager CRUD API ---
+
+@app.route("/admin/faq")
+def admin_faq_page():
+    """FAQ 관리 페이지를 반환한다."""
+    return send_from_directory(os.path.join(BASE_DIR, "web"), "faq-manager.html")
+
+
+@app.route("/api/admin/faq", methods=["GET"])
+@jwt_auth.require_auth()
+def admin_faq_list():
+    """모든 FAQ 항목을 메타데이터와 함께 반환한다."""
+    try:
+        category = request.args.get("category", "").strip()
+        search = request.args.get("search", "").strip().lower()
+        items = faq_manager.list_all()
+
+        if category:
+            items = [it for it in items if it.get("category") == category]
+        if search:
+            items = [
+                it for it in items
+                if search in it.get("question", "").lower()
+                or search in it.get("answer", "").lower()
+                or search in it.get("id", "").lower()
+            ]
+
+        return jsonify({"items": items, "count": len(items)})
+    except Exception as e:
+        logger.error(f"FAQ 목록 조회 실패: {e}")
+        return jsonify({"error": "FAQ 목록 조회 중 오류가 발생했습니다."}), 500
+
+
+@app.route("/api/admin/faq", methods=["POST"])
+@jwt_auth.require_auth()
+def admin_faq_create():
+    """새 FAQ 항목을 추가한다."""
+    data = request.get_json(silent=True)
+    if not data:
+        return jsonify({"error": "요청 본문이 필요합니다."}), 400
+
+    try:
+        item = faq_manager.create(data)
+        _reload_chatbot_faq()
+        return jsonify({"success": True, "item": item}), 201
+    except ValueError as e:
+        return jsonify({"error": str(e)}), 400
+    except Exception as e:
+        logger.error(f"FAQ 생성 실패: {e}")
+        return jsonify({"error": "FAQ 생성 중 오류가 발생했습니다."}), 500
+
+
+@app.route("/api/admin/faq/<faq_id>", methods=["PUT"])
+@jwt_auth.require_auth()
+def admin_faq_update(faq_id):
+    """FAQ 항목을 수정한다."""
+    data = request.get_json(silent=True)
+    if not data:
+        return jsonify({"error": "요청 본문이 필요합니다."}), 400
+
+    try:
+        item = faq_manager.update(faq_id, data)
+        _reload_chatbot_faq()
+        return jsonify({"success": True, "item": item})
+    except KeyError as e:
+        return jsonify({"error": str(e)}), 404
+    except ValueError as e:
+        return jsonify({"error": str(e)}), 400
+    except Exception as e:
+        logger.error(f"FAQ 수정 실패: {e}")
+        return jsonify({"error": "FAQ 수정 중 오류가 발생했습니다."}), 500
+
+
+@app.route("/api/admin/faq/<faq_id>", methods=["DELETE"])
+@jwt_auth.require_auth()
+def admin_faq_delete(faq_id):
+    """FAQ 항목을 삭제한다."""
+    try:
+        deleted = faq_manager.delete(faq_id)
+        _reload_chatbot_faq()
+        return jsonify({"success": True, "deleted": deleted})
+    except KeyError as e:
+        return jsonify({"error": str(e)}), 404
+    except Exception as e:
+        logger.error(f"FAQ 삭제 실패: {e}")
+        return jsonify({"error": "FAQ 삭제 중 오류가 발생했습니다."}), 500
+
+
+@app.route("/api/admin/faq/<faq_id>/history", methods=["GET"])
+@jwt_auth.require_auth()
+def admin_faq_history(faq_id):
+    """FAQ 항목의 변경 이력을 반환한다."""
+    try:
+        history = faq_manager.get_history(faq_id)
+        return jsonify({"faq_id": faq_id, "history": history, "count": len(history)})
+    except Exception as e:
+        logger.error(f"FAQ 이력 조회 실패: {e}")
+        return jsonify({"error": "FAQ 이력 조회 중 오류가 발생했습니다."}), 500
+
+
+def _reload_chatbot_faq():
+    """Reload chatbot FAQ data after a CRUD operation."""
+    try:
+        chatbot.faq_data = load_json("data/faq.json")
+        chatbot.faq_items = chatbot.faq_data.get("items", [])
+        chatbot.tfidf_matcher = __import__(
+            "src.similarity", fromlist=["TFIDFMatcher"]
+        ).TFIDFMatcher(chatbot.faq_items)
+        chatbot.related_faq_finder = __import__(
+            "src.related_faq", fromlist=["RelatedFAQFinder"]
+        ).RelatedFAQFinder(chatbot.faq_items)
+        _refresh_faq_cache()
+        logger.info("FAQ data reloaded after CRUD operation")
+    except Exception as e:
+        logger.error(f"FAQ 리로드 실패: {e}")
+
+
+
+# --- Webhook API endpoints ---
+
+@app.route("/api/admin/webhooks", methods=["POST"])
+@jwt_auth.require_auth()
+def admin_webhook_register():
+    """Register a new webhook subscription."""
+    data = request.get_json(silent=True)
+    if not data or "url" not in data or "events" not in data:
+        return jsonify({"error": "url과 events 필드가 필요합니다."}), 400
+
+    url = data["url"]
+    events = data["events"]
+    secret = data.get("secret")
+
+    if not isinstance(events, list) or not events:
+        return jsonify({"error": "events는 비어 있지 않은 배열이어야 합니다."}), 400
+
+    try:
+        subscription_id = webhook_manager.register(url, events, secret)
+        return jsonify({"success": True, "subscription_id": subscription_id}), 201
+    except ValueError as e:
+        return jsonify({"error": str(e)}), 400
+    except Exception as e:
+        logger.error(f"웹훅 등록 실패: {e}")
+        return jsonify({"error": "웹훅 등록 중 오류가 발생했습니다."}), 500
+
+
+@app.route("/api/admin/webhooks", methods=["GET"])
+@jwt_auth.require_auth()
+def admin_webhook_list():
+    """List all active webhook subscriptions."""
+    try:
+        subscriptions = webhook_manager.list_subscriptions()
+        return jsonify({"subscriptions": subscriptions, "count": len(subscriptions)})
+    except Exception as e:
+        logger.error(f"웹훅 목록 조회 실패: {e}")
+        return jsonify({"error": "웹훅 목록 조회 중 오류가 발생했습니다."}), 500
+
+
+@app.route("/api/admin/webhooks/<subscription_id>", methods=["DELETE"])
+@jwt_auth.require_auth()
+def admin_webhook_unregister(subscription_id):
+    """Unregister a webhook subscription."""
+    try:
+        removed = webhook_manager.unregister(subscription_id)
+        if removed:
+            return jsonify({"success": True, "subscription_id": subscription_id})
+        else:
+            return jsonify({"error": "구독을 찾을 수 없습니다."}), 404
+    except Exception as e:
+        logger.error(f"웹훅 해제 실패: {e}")
+        return jsonify({"error": "웹훅 해제 중 오류가 발생했습니다."}), 500
+
+
+@app.route("/api/admin/webhooks/<subscription_id>/deliveries", methods=["GET"])
+@jwt_auth.require_auth()
+def admin_webhook_deliveries(subscription_id):
+    """Get delivery log for a webhook subscription."""
+    try:
+        limit = request.args.get("limit", 50, type=int)
+        deliveries = webhook_manager.get_delivery_log(subscription_id=subscription_id, limit=limit)
+        return jsonify({"deliveries": deliveries, "count": len(deliveries)})
+    except Exception as e:
+        logger.error(f"웹훅 배달 로그 조회 실패: {e}")
+        return jsonify({"error": "웹훅 배달 로그 조회 중 오류가 발생했습니다."}), 500
+
+
+@app.route("/api/admin/webhooks/test", methods=["POST"])
+@jwt_auth.require_auth()
+def admin_webhook_test():
+    """Send a test event to all subscribers of the given event type."""
+    data = request.get_json(silent=True)
+    event_type = data.get("event_type", "query.received") if data else "query.received"
+
+    test_payload = {
+        "test": True,
+        "message": "This is a test webhook delivery.",
+    }
+
+    try:
+        count = webhook_manager.emit(event_type, test_payload)
+        return jsonify({"success": True, "subscribers_notified": count, "event_type": event_type})
+    except ValueError as e:
+        return jsonify({"error": str(e)}), 400
+    except Exception as e:
+        logger.error(f"테스트 웹훅 전송 실패: {e}")
+        return jsonify({"error": "테스트 웹훅 전송 중 오류가 발생했습니다."}), 500
 
 
 def main():

@@ -11,12 +11,12 @@
 | FAQ | 50개 (v3.0.0) |
 | 질문 카테고리 | 10개 |
 | 에스컬레이션 규칙 | 5개 |
-| 테스트 | 742개 (전체 PASS) |
-| 소스 코드 | 8,357줄 (src/ + web_server + simulator) |
-| 테스트 코드 | 7,750줄 |
-| 소스 파일 | 39개 |
-| 테스트 파일 | 33개 |
-| 커밋 | 34개 |
+| 테스트 | 895개 (전체 PASS) |
+| 소스 코드 | 10,238줄 (src/ + web_server + simulator) |
+| 테스트 코드 | 9,408줄 |
+| 소스 파일 | 43개 |
+| 테스트 파일 | 37개 |
+| 커밋 | 37개 |
 
 ---
 
@@ -48,6 +48,10 @@
 | 백업 자동화 | 증분 백업, 암호화, 복원 검증, 스케줄 |
 | 부하 테스트 | 6개 시나리오, 벤치마크, 성능 리포트 |
 | 네이버 톡톡 | 웹훅 어댑터, 캐러셀 카드, 복합 메시지 |
+| FAQ 관리 UI | 웹 CRUD, 실시간 미리보기, 버전 히스토리 |
+| 분석 리포트 | 일간/주간/월간 자동생성, HTML 리포트 |
+| 멀티 테넌트 | 복수 보세전시장 지원, 테넌트별 FAQ/설정 분리 |
+| 웹훅 시스템 | 이벤트 발송, HMAC 서명, 구독 관리, 배송 로그 |
 
 ---
 
@@ -228,7 +232,7 @@ docker-compose up -d
 
 ### 테스트
 ```bash
-python -m pytest tests/ -v       # 742개 테스트 전체 PASS
+python -m pytest tests/ -v       # 895개 테스트 전체 PASS
 
 # 특정 모듈만
 python -m pytest tests/test_chatbot.py -v
@@ -291,8 +295,12 @@ bonded-exhibition-chatbot-data/
 │   ├── slack_notifier.py          # Slack 알림 (웹훅, 재시도)
 │   ├── backup_manager.py          # 백업/복구 (증분, 암호화, 스케줄)
 │   ├── naver_adapter.py           # 네이버 톡톡 어댑터
+│   ├── faq_manager.py             # FAQ CRUD + 버전 히스토리
+│   ├── report_generator.py        # 분석 리포트 (일간/주간/월간)
+│   ├── tenant_manager.py          # 멀티 테넌트 관리
+│   ├── webhook_manager.py         # 이벤트 웹훅 시스템
 │   └── utils.py                   # 유틸리티
-├── tests/                         # 742개 테스트
+├── tests/                         # 895개 테스트
 │   ├── test_chatbot.py            # 통합 테스트
 │   ├── test_classifier.py         # 분류기
 │   ├── test_similarity.py         # TF-IDF 매칭
@@ -323,12 +331,17 @@ bonded-exhibition-chatbot-data/
 │   ├── test_naver_adapter.py      # 네이버 톡톡 테스트
 │   ├── test_openapi.py            # OpenAPI 스펙 테스트
 │   ├── test_benchmark.py          # 벤치마크 테스트
+│   ├── test_faq_manager.py        # FAQ 관리 테스트
+│   ├── test_report_generator.py   # 리포트 생성 테스트
+│   ├── test_tenant_manager.py     # 멀티 테넌트 테스트
+│   ├── test_webhook_manager.py    # 웹훅 테스트
 │   └── test_web_api.py            # 웹 API
 ├── web/
 │   ├── index.html                 # 챗봇 UI (다크/라이트 테마, PWA, 음성, 접근성)
 │   ├── admin.html                 # 관리자 대시보드 (JWT 인증)
 │   ├── login.html                 # 관리자 로그인 페이지
 │   ├── swagger.html               # Swagger UI (API 문서)
+│   ├── faq-manager.html           # FAQ 관리 UI (CRUD)
 │   ├── manifest.json              # PWA 매니페스트
 │   ├── sw.js                      # 서비스 워커 (오프라인 캐싱)
 │   ├── icon-192.svg               # PWA 아이콘 (192x192)
@@ -454,6 +467,8 @@ timeline
         엔터프라이즈 : JWT인증, 법령자동업데이트, CD파이프라인, Prometheus
     section Phase 31-34
         확장 + 품질 : OpenAPI, 백업자동화, 부하테스트, 네이버톡톡
+    section Phase 35-38
+        관리 + 확장 : FAQ CRUD, 분석리포트, 멀티테넌트, 웹훅
 ```
 
 ## 업데이트 내역
@@ -468,6 +483,7 @@ timeline
 | v5.0.0 | Phase 19-26 (타이핑이펙트, 테마토글, 접근성, 성능최적화, 카카오톡, 통합테스트) |
 | v6.0.0 | Phase 27-30 (JWT 인증, 법령 자동 업데이트, CD 파이프라인, Prometheus, Slack 알림) |
 | v7.0.0 | Phase 31-34 (OpenAPI/Swagger, 백업 자동화, 부하 테스트/벤치마크, 네이버 톡톡) |
+| v8.0.0 | Phase 35-38 (FAQ 관리 UI, 분석 리포트, 멀티 테넌트, 웹훅 시스템) |
 
 ## 기술 스택
 

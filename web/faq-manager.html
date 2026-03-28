@@ -1,0 +1,737 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>FAQ 관리 - 보세전시장 챗봇</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+            background: #1a1a2e;
+            color: #e0e0e0;
+            line-height: 1.6;
+        }
+        .header {
+            background: #16213e;
+            color: #fff;
+            padding: 1rem 2rem;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            border-bottom: 1px solid #0f3460;
+        }
+        .header h1 { font-size: 1.3rem; }
+        .header-links a {
+            color: #a8d0f0;
+            text-decoration: none;
+            font-size: 0.9rem;
+            margin-left: 1.5rem;
+        }
+        .header-links a:hover { text-decoration: underline; }
+        .container { max-width: 1400px; margin: 0 auto; padding: 1.5rem; }
+
+        /* Toolbar */
+        .toolbar {
+            display: flex;
+            gap: 1rem;
+            margin-bottom: 1.5rem;
+            flex-wrap: wrap;
+            align-items: center;
+        }
+        .toolbar input, .toolbar select {
+            background: #16213e;
+            border: 1px solid #0f3460;
+            color: #e0e0e0;
+            padding: 0.5rem 0.8rem;
+            border-radius: 6px;
+            font-size: 0.9rem;
+        }
+        .toolbar input:focus, .toolbar select:focus {
+            outline: none;
+            border-color: #e94560;
+        }
+        .toolbar input { flex: 1; min-width: 200px; }
+        .btn {
+            padding: 0.5rem 1.2rem;
+            border: none;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 0.9rem;
+            font-weight: 600;
+            transition: opacity 0.2s;
+        }
+        .btn:hover { opacity: 0.85; }
+        .btn-primary { background: #e94560; color: #fff; }
+        .btn-secondary { background: #0f3460; color: #e0e0e0; }
+        .btn-danger { background: #c0392b; color: #fff; }
+        .btn-sm { padding: 0.3rem 0.7rem; font-size: 0.8rem; }
+
+        /* Table */
+        .faq-table {
+            width: 100%;
+            border-collapse: collapse;
+            background: #16213e;
+            border-radius: 8px;
+            overflow: hidden;
+        }
+        .faq-table th, .faq-table td {
+            padding: 0.8rem 1rem;
+            text-align: left;
+            border-bottom: 1px solid #0f3460;
+        }
+        .faq-table th {
+            background: #0f3460;
+            color: #a8d0f0;
+            font-size: 0.85rem;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+        .faq-table tr:hover { background: #1a1a3e; }
+        .faq-table .question-cell {
+            max-width: 350px;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+        }
+        .category-badge {
+            display: inline-block;
+            padding: 0.2rem 0.5rem;
+            border-radius: 4px;
+            font-size: 0.75rem;
+            font-weight: 600;
+            background: #0f3460;
+            color: #a8d0f0;
+        }
+        .actions-cell { white-space: nowrap; }
+        .actions-cell .btn { margin-right: 0.3rem; }
+        .modified-cell { font-size: 0.8rem; color: #888; }
+        .count-badge {
+            display: inline-block;
+            background: #e94560;
+            color: #fff;
+            padding: 0.1rem 0.5rem;
+            border-radius: 10px;
+            font-size: 0.75rem;
+            font-weight: 700;
+        }
+
+        /* Modal */
+        .modal-overlay {
+            display: none;
+            position: fixed;
+            top: 0; left: 0; right: 0; bottom: 0;
+            background: rgba(0,0,0,0.7);
+            z-index: 1000;
+            justify-content: center;
+            align-items: flex-start;
+            padding: 2rem;
+            overflow-y: auto;
+        }
+        .modal-overlay.active { display: flex; }
+        .modal {
+            background: #16213e;
+            border-radius: 10px;
+            width: 100%;
+            max-width: 900px;
+            border: 1px solid #0f3460;
+        }
+        .modal-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 1rem 1.5rem;
+            border-bottom: 1px solid #0f3460;
+        }
+        .modal-header h2 { font-size: 1.1rem; color: #fff; }
+        .modal-close {
+            background: none;
+            border: none;
+            color: #888;
+            font-size: 1.5rem;
+            cursor: pointer;
+        }
+        .modal-close:hover { color: #fff; }
+        .modal-body {
+            padding: 1.5rem;
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 1.5rem;
+        }
+        .form-section { display: flex; flex-direction: column; gap: 1rem; }
+        .preview-section {
+            background: #1a1a2e;
+            border-radius: 8px;
+            padding: 1rem;
+            border: 1px solid #0f3460;
+        }
+        .preview-section h3 {
+            font-size: 0.9rem;
+            color: #a8d0f0;
+            margin-bottom: 0.8rem;
+        }
+        .preview-bubble {
+            background: #0f3460;
+            padding: 1rem;
+            border-radius: 12px;
+            font-size: 0.9rem;
+            line-height: 1.7;
+            white-space: pre-wrap;
+        }
+        .preview-bubble .legal {
+            margin-top: 0.8rem;
+            font-size: 0.8rem;
+            color: #888;
+            border-top: 1px solid #1a1a2e;
+            padding-top: 0.5rem;
+        }
+        .form-group { display: flex; flex-direction: column; gap: 0.3rem; }
+        .form-group label {
+            font-size: 0.85rem;
+            color: #a8d0f0;
+            font-weight: 600;
+        }
+        .form-group input, .form-group select, .form-group textarea {
+            background: #1a1a2e;
+            border: 1px solid #0f3460;
+            color: #e0e0e0;
+            padding: 0.5rem 0.8rem;
+            border-radius: 6px;
+            font-size: 0.9rem;
+            font-family: inherit;
+        }
+        .form-group textarea { resize: vertical; min-height: 80px; }
+        .form-group input:focus, .form-group select:focus, .form-group textarea:focus {
+            outline: none;
+            border-color: #e94560;
+        }
+
+        /* Tag input */
+        .tag-input-wrapper {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 0.3rem;
+            background: #1a1a2e;
+            border: 1px solid #0f3460;
+            border-radius: 6px;
+            padding: 0.4rem;
+            min-height: 38px;
+            cursor: text;
+        }
+        .tag-input-wrapper:focus-within { border-color: #e94560; }
+        .tag {
+            display: inline-flex;
+            align-items: center;
+            background: #0f3460;
+            color: #a8d0f0;
+            padding: 0.2rem 0.5rem;
+            border-radius: 4px;
+            font-size: 0.8rem;
+        }
+        .tag .tag-remove {
+            margin-left: 0.3rem;
+            cursor: pointer;
+            font-weight: bold;
+            color: #e94560;
+        }
+        .tag-input-field {
+            border: none;
+            background: transparent;
+            color: #e0e0e0;
+            outline: none;
+            font-size: 0.85rem;
+            flex: 1;
+            min-width: 80px;
+            padding: 0.2rem;
+        }
+
+        .modal-footer {
+            display: flex;
+            justify-content: flex-end;
+            gap: 0.8rem;
+            padding: 1rem 1.5rem;
+            border-top: 1px solid #0f3460;
+        }
+
+        /* History modal */
+        .history-list { max-height: 400px; overflow-y: auto; }
+        .history-entry {
+            padding: 0.8rem;
+            border-bottom: 1px solid #0f3460;
+        }
+        .history-entry .action {
+            font-weight: 600;
+            text-transform: uppercase;
+            font-size: 0.8rem;
+        }
+        .history-entry .action.create { color: #2ecc71; }
+        .history-entry .action.update { color: #f39c12; }
+        .history-entry .action.delete { color: #e74c3c; }
+        .history-entry .timestamp { font-size: 0.8rem; color: #888; margin-left: 0.5rem; }
+
+        /* Confirm dialog */
+        .confirm-overlay {
+            display: none;
+            position: fixed;
+            top: 0; left: 0; right: 0; bottom: 0;
+            background: rgba(0,0,0,0.7);
+            z-index: 2000;
+            justify-content: center;
+            align-items: center;
+        }
+        .confirm-overlay.active { display: flex; }
+        .confirm-box {
+            background: #16213e;
+            border-radius: 10px;
+            padding: 2rem;
+            text-align: center;
+            border: 1px solid #0f3460;
+            max-width: 400px;
+        }
+        .confirm-box p { margin-bottom: 1.5rem; }
+        .confirm-box .btn { margin: 0 0.3rem; }
+
+        .empty-state {
+            text-align: center;
+            padding: 3rem;
+            color: #888;
+        }
+
+        @media (max-width: 768px) {
+            .modal-body { grid-template-columns: 1fr; }
+            .toolbar { flex-direction: column; }
+            .toolbar input { min-width: auto; }
+        }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <h1>FAQ 관리</h1>
+        <div class="header-links">
+            <a href="/admin">대시보드</a>
+            <a href="/">챗봇</a>
+            <a href="#" id="logoutBtn">로그아웃</a>
+        </div>
+    </div>
+
+    <div class="container">
+        <div class="toolbar">
+            <input type="text" id="searchInput" placeholder="질문, 답변, ID로 검색...">
+            <select id="categoryFilter">
+                <option value="">모든 카테고리</option>
+                <option value="GENERAL">제도 일반</option>
+                <option value="LICENSE">특허/운영</option>
+                <option value="IMPORT_EXPORT">반입/반출</option>
+                <option value="EXHIBITION">전시/사용</option>
+                <option value="SALES">판매/직매</option>
+                <option value="SAMPLE">견본품</option>
+                <option value="FOOD_TASTING">시식용 식품</option>
+                <option value="DOCUMENTS">서류/신고</option>
+                <option value="PENALTIES">벌칙/제재</option>
+                <option value="CONTACT">담당기관 문의</option>
+            </select>
+            <button class="btn btn-primary" id="addBtn">+ FAQ 추가</button>
+        </div>
+
+        <table class="faq-table">
+            <thead>
+                <tr>
+                    <th>ID</th>
+                    <th>카테고리</th>
+                    <th>질문</th>
+                    <th>키워드</th>
+                    <th>수정일</th>
+                    <th>작업</th>
+                </tr>
+            </thead>
+            <tbody id="faqTableBody">
+                <tr><td colspan="6" class="empty-state">로딩 중...</td></tr>
+            </tbody>
+        </table>
+    </div>
+
+    <!-- FAQ Edit/Add Modal -->
+    <div class="modal-overlay" id="faqModal">
+        <div class="modal">
+            <div class="modal-header">
+                <h2 id="modalTitle">FAQ 추가</h2>
+                <button class="modal-close" id="modalClose">&times;</button>
+            </div>
+            <div class="modal-body">
+                <div class="form-section">
+                    <div class="form-group">
+                        <label for="faqId">ID (비워두면 자동 생성)</label>
+                        <input type="text" id="faqId" placeholder="예: AA">
+                    </div>
+                    <div class="form-group">
+                        <label for="faqCategory">카테고리 *</label>
+                        <select id="faqCategory">
+                            <option value="">선택하세요</option>
+                            <option value="GENERAL">제도 일반</option>
+                            <option value="LICENSE">특허/운영</option>
+                            <option value="IMPORT_EXPORT">반입/반출</option>
+                            <option value="EXHIBITION">전시/사용</option>
+                            <option value="SALES">판매/직매</option>
+                            <option value="SAMPLE">견본품</option>
+                            <option value="FOOD_TASTING">시식용 식품</option>
+                            <option value="DOCUMENTS">서류/신고</option>
+                            <option value="PENALTIES">벌칙/제재</option>
+                            <option value="CONTACT">담당기관 문의</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label for="faqQuestion">질문 *</label>
+                        <textarea id="faqQuestion" rows="2" placeholder="질문을 입력하세요"></textarea>
+                    </div>
+                    <div class="form-group">
+                        <label for="faqAnswer">답변 *</label>
+                        <textarea id="faqAnswer" rows="5" placeholder="답변을 입력하세요"></textarea>
+                    </div>
+                    <div class="form-group">
+                        <label>키워드 (Enter로 추가)</label>
+                        <div class="tag-input-wrapper" id="keywordsWrapper">
+                            <input type="text" class="tag-input-field" id="keywordInput" placeholder="키워드 입력 후 Enter">
+                        </div>
+                    </div>
+                    <div class="form-group">
+                        <label for="faqLegalBasis">법적 근거 (쉼표로 구분)</label>
+                        <textarea id="faqLegalBasis" rows="2" placeholder="예: 관세법 제190조, 보세전시장 운영에 관한 고시"></textarea>
+                    </div>
+                    <div class="form-group">
+                        <label for="faqNotes">비고</label>
+                        <textarea id="faqNotes" rows="2" placeholder="내부 참고 사항"></textarea>
+                    </div>
+                </div>
+                <div class="preview-section">
+                    <h3>챗봇 미리보기</h3>
+                    <div class="preview-bubble" id="previewBubble">
+                        답변을 입력하면 여기에 미리보기가 표시됩니다.
+                    </div>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button class="btn btn-secondary" id="modalCancel">취소</button>
+                <button class="btn btn-primary" id="modalSave">저장</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- History Modal -->
+    <div class="modal-overlay" id="historyModal">
+        <div class="modal" style="max-width:600px;">
+            <div class="modal-header">
+                <h2 id="historyTitle">변경 이력</h2>
+                <button class="modal-close" id="historyClose">&times;</button>
+            </div>
+            <div class="modal-body" style="display:block;">
+                <div class="history-list" id="historyList">
+                    <div class="empty-state">이력이 없습니다.</div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Confirm Dialog -->
+    <div class="confirm-overlay" id="confirmDialog">
+        <div class="confirm-box">
+            <p id="confirmMessage">정말 삭제하시겠습니까?</p>
+            <button class="btn btn-secondary" id="confirmCancel">취소</button>
+            <button class="btn btn-danger" id="confirmOk">삭제</button>
+        </div>
+    </div>
+
+<script>
+(function() {
+    const API_BASE = '/api/admin/faq';
+    const token = localStorage.getItem('jwt_token');
+
+    // Auth check
+    if (!token) {
+        window.location.href = '/login';
+        return;
+    }
+
+    const CATEGORY_LABELS = {
+        'GENERAL': '제도 일반',
+        'LICENSE': '특허/운영',
+        'IMPORT_EXPORT': '반입/반출',
+        'EXHIBITION': '전시/사용',
+        'SALES': '판매/직매',
+        'SAMPLE': '견본품',
+        'FOOD_TASTING': '시식용 식품',
+        'DOCUMENTS': '서류/신고',
+        'PENALTIES': '벌칙/제재',
+        'CONTACT': '담당기관 문의'
+    };
+
+    let editingId = null;
+    let keywords = [];
+    let deleteTargetId = null;
+
+    // --- API helpers ---
+    function apiHeaders() {
+        return {
+            'Content-Type': 'application/json',
+            'Authorization': 'Bearer ' + token
+        };
+    }
+
+    async function apiFetch(url, options) {
+        const res = await fetch(url, options);
+        if (res.status === 401 || res.status === 403) {
+            localStorage.removeItem('jwt_token');
+            window.location.href = '/login';
+            return null;
+        }
+        return res;
+    }
+
+    // --- Load FAQ list ---
+    async function loadFAQs() {
+        const category = document.getElementById('categoryFilter').value;
+        const search = document.getElementById('searchInput').value.trim();
+        let url = API_BASE + '?';
+        if (category) url += 'category=' + encodeURIComponent(category) + '&';
+        if (search) url += 'search=' + encodeURIComponent(search) + '&';
+
+        const res = await apiFetch(url, { headers: apiHeaders() });
+        if (!res) return;
+        const data = await res.json();
+
+        const tbody = document.getElementById('faqTableBody');
+        if (!data.items || data.items.length === 0) {
+            tbody.innerHTML = '<tr><td colspan="6" class="empty-state">FAQ 항목이 없습니다.</td></tr>';
+            return;
+        }
+
+        tbody.innerHTML = data.items.map(item => {
+            const catLabel = CATEGORY_LABELS[item.category] || item.category;
+            const question = item.question.length > 60 ? item.question.slice(0, 60) + '...' : item.question;
+            const modified = item.last_modified
+                ? new Date(item.last_modified).toLocaleDateString('ko-KR')
+                : '-';
+            return `<tr>
+                <td><strong>${escHtml(item.id)}</strong></td>
+                <td><span class="category-badge">${escHtml(catLabel)}</span></td>
+                <td class="question-cell" title="${escHtml(item.question)}">${escHtml(question)}</td>
+                <td><span class="count-badge">${item.keywords_count || 0}</span></td>
+                <td class="modified-cell">${modified}</td>
+                <td class="actions-cell">
+                    <button class="btn btn-secondary btn-sm" onclick="window._faqEdit('${escHtml(item.id)}')">수정</button>
+                    <button class="btn btn-danger btn-sm" onclick="window._faqDelete('${escHtml(item.id)}')">삭제</button>
+                    <button class="btn btn-secondary btn-sm" onclick="window._faqHistory('${escHtml(item.id)}')">이력</button>
+                </td>
+            </tr>`;
+        }).join('');
+    }
+
+    function escHtml(str) {
+        const d = document.createElement('div');
+        d.textContent = str || '';
+        return d.innerHTML;
+    }
+
+    // --- Modal management ---
+    function openModal(title, item) {
+        editingId = item ? item.id : null;
+        document.getElementById('modalTitle').textContent = title;
+        document.getElementById('faqId').value = item ? item.id : '';
+        document.getElementById('faqId').disabled = !!item;
+        document.getElementById('faqCategory').value = item ? item.category : '';
+        document.getElementById('faqQuestion').value = item ? item.question : '';
+        document.getElementById('faqAnswer').value = item ? item.answer : '';
+        document.getElementById('faqLegalBasis').value = item ? (item.legal_basis || []).join(', ') : '';
+        document.getElementById('faqNotes').value = item ? (item.notes || '') : '';
+        keywords = item ? [...(item.keywords || [])] : [];
+        renderTags();
+        updatePreview();
+        document.getElementById('faqModal').classList.add('active');
+    }
+
+    function closeModal() {
+        document.getElementById('faqModal').classList.remove('active');
+        editingId = null;
+    }
+
+    // --- Tag input ---
+    function renderTags() {
+        const wrapper = document.getElementById('keywordsWrapper');
+        const input = document.getElementById('keywordInput');
+        wrapper.querySelectorAll('.tag').forEach(t => t.remove());
+        keywords.forEach((kw, i) => {
+            const tag = document.createElement('span');
+            tag.className = 'tag';
+            tag.innerHTML = escHtml(kw) + ' <span class="tag-remove" data-idx="' + i + '">&times;</span>';
+            wrapper.insertBefore(tag, input);
+        });
+    }
+
+    document.getElementById('keywordsWrapper').addEventListener('click', function(e) {
+        if (e.target.classList.contains('tag-remove')) {
+            keywords.splice(parseInt(e.target.dataset.idx), 1);
+            renderTags();
+        }
+        document.getElementById('keywordInput').focus();
+    });
+
+    document.getElementById('keywordInput').addEventListener('keydown', function(e) {
+        if (e.key === 'Enter') {
+            e.preventDefault();
+            const val = this.value.trim();
+            if (val && !keywords.includes(val)) {
+                keywords.push(val);
+                renderTags();
+            }
+            this.value = '';
+        }
+    });
+
+    // --- Preview ---
+    function updatePreview() {
+        const answer = document.getElementById('faqAnswer').value || '(답변 없음)';
+        const legalRaw = document.getElementById('faqLegalBasis').value.trim();
+        let html = escHtml(answer);
+        if (legalRaw) {
+            const bases = legalRaw.split(',').map(s => s.trim()).filter(Boolean);
+            html += '\n<div class="legal">관련 법령: ' + bases.map(escHtml).join(', ') + '</div>';
+        }
+        document.getElementById('previewBubble').innerHTML = html;
+    }
+
+    document.getElementById('faqAnswer').addEventListener('input', updatePreview);
+    document.getElementById('faqLegalBasis').addEventListener('input', updatePreview);
+
+    // --- Save ---
+    document.getElementById('modalSave').addEventListener('click', async function() {
+        const payload = {
+            category: document.getElementById('faqCategory').value,
+            question: document.getElementById('faqQuestion').value.trim(),
+            answer: document.getElementById('faqAnswer').value.trim(),
+            keywords: keywords,
+            legal_basis: document.getElementById('faqLegalBasis').value.split(',').map(s => s.trim()).filter(Boolean),
+            notes: document.getElementById('faqNotes').value.trim()
+        };
+
+        const idVal = document.getElementById('faqId').value.trim();
+        if (idVal && !editingId) {
+            payload.id = idVal;
+        }
+
+        let url = API_BASE;
+        let method = 'POST';
+        if (editingId) {
+            url = API_BASE + '/' + editingId;
+            method = 'PUT';
+        }
+
+        const res = await apiFetch(url, {
+            method: method,
+            headers: apiHeaders(),
+            body: JSON.stringify(payload)
+        });
+        if (!res) return;
+        const data = await res.json();
+        if (data.error) {
+            alert(data.error);
+            return;
+        }
+        closeModal();
+        loadFAQs();
+    });
+
+    // --- Edit ---
+    window._faqEdit = async function(id) {
+        const res = await apiFetch(API_BASE + '?search=' + encodeURIComponent(id), { headers: apiHeaders() });
+        if (!res) return;
+        const data = await res.json();
+        const item = (data.items || []).find(it => it.id === id);
+        if (item) {
+            openModal('FAQ 수정: ' + id, item);
+        }
+    };
+
+    // --- Delete ---
+    window._faqDelete = function(id) {
+        deleteTargetId = id;
+        document.getElementById('confirmMessage').textContent = 'FAQ "' + id + '"을(를) 정말 삭제하시겠습니까?';
+        document.getElementById('confirmDialog').classList.add('active');
+    };
+
+    document.getElementById('confirmOk').addEventListener('click', async function() {
+        if (!deleteTargetId) return;
+        const res = await apiFetch(API_BASE + '/' + deleteTargetId, {
+            method: 'DELETE',
+            headers: apiHeaders()
+        });
+        document.getElementById('confirmDialog').classList.remove('active');
+        deleteTargetId = null;
+        if (!res) return;
+        const data = await res.json();
+        if (data.error) {
+            alert(data.error);
+            return;
+        }
+        loadFAQs();
+    });
+
+    document.getElementById('confirmCancel').addEventListener('click', function() {
+        document.getElementById('confirmDialog').classList.remove('active');
+        deleteTargetId = null;
+    });
+
+    // --- History ---
+    window._faqHistory = async function(id) {
+        document.getElementById('historyTitle').textContent = 'FAQ "' + id + '" 변경 이력';
+        const res = await apiFetch(API_BASE + '/' + id + '/history', { headers: apiHeaders() });
+        if (!res) return;
+        const data = await res.json();
+        const list = document.getElementById('historyList');
+        if (!data.history || data.history.length === 0) {
+            list.innerHTML = '<div class="empty-state">변경 이력이 없습니다.</div>';
+        } else {
+            list.innerHTML = data.history.map(h => {
+                const ts = new Date(h.timestamp).toLocaleString('ko-KR');
+                return '<div class="history-entry">' +
+                    '<span class="action ' + h.action + '">' + h.action + '</span>' +
+                    '<span class="timestamp">' + ts + '</span>' +
+                    '</div>';
+            }).join('');
+        }
+        document.getElementById('historyModal').classList.add('active');
+    };
+
+    // --- Event bindings ---
+    document.getElementById('addBtn').addEventListener('click', function() { openModal('FAQ 추가', null); });
+    document.getElementById('modalClose').addEventListener('click', closeModal);
+    document.getElementById('modalCancel').addEventListener('click', closeModal);
+    document.getElementById('historyClose').addEventListener('click', function() {
+        document.getElementById('historyModal').classList.remove('active');
+    });
+
+    let searchTimeout;
+    document.getElementById('searchInput').addEventListener('input', function() {
+        clearTimeout(searchTimeout);
+        searchTimeout = setTimeout(loadFAQs, 300);
+    });
+    document.getElementById('categoryFilter').addEventListener('change', loadFAQs);
+
+    document.getElementById('logoutBtn').addEventListener('click', function(e) {
+        e.preventDefault();
+        localStorage.removeItem('jwt_token');
+        window.location.href = '/login';
+    });
+
+    // Close modals on overlay click
+    document.getElementById('faqModal').addEventListener('click', function(e) {
+        if (e.target === this) closeModal();
+    });
+    document.getElementById('historyModal').addEventListener('click', function(e) {
+        if (e.target === this) this.classList.remove('active');
+    });
+
+    // Initial load
+    loadFAQs();
+})();
+</script>
+</body>
+</html>
