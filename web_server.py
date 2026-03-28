@@ -13,6 +13,7 @@ import logging
 import os
 import sys
 import time
+from datetime import datetime
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
@@ -21,6 +22,7 @@ from src.chatbot import BondedExhibitionChatbot
 from src.metrics import metrics as metrics_collector
 from src.classifier import classify_query
 from src.conversation_export import ConversationExporter
+from src.conversation_summary import ConversationSummarizer
 from src.escalation import check_escalation, get_escalation_contact
 from src.analytics import QueryAnalytics
 from src.auto_faq_pipeline import AutoFAQPipeline
@@ -42,6 +44,7 @@ from src.report_generator import ReportGenerator
 from src.realtime_monitor import RealtimeMonitor
 from src.satisfaction_tracker import SatisfactionTracker
 from src.security import APIKeyAuth, RateLimiter, sanitize_input
+from src.rate_limiter_v2 import AdvancedRateLimiter
 from src.translator import SimpleTranslator
 from src.auth import JWTAuth, authenticate_user
 from src.law_updater import LawUpdateScheduler, LawVersionTracker, FAQUpdateNotifier
@@ -52,7 +55,9 @@ from src.webhook_manager import WebhookManager
 from src.audit_logger import AuditLogger
 from src.alert_center import AlertCenter, AlertRuleEngine
 from src.profiler import Profiler, RequestProfiler, ComponentBenchmark
+from src.health_monitor import HealthMonitor
 from src.i18n import I18nManager
+from src.db_migration import MigrationManager
 from src.utils import load_json
 
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
@@ -86,10 +91,12 @@ auto_faq_pipeline = AutoFAQPipeline(
 api_key_auth = APIKeyAuth(app)
 rate_limit_value = int(os.environ.get("CHATBOT_RATE_LIMIT", "60"))
 rate_limiter = RateLimiter(max_requests=rate_limit_value)
+advanced_rate_limiter = AdvancedRateLimiter()
 
 # Phase 13-18 모듈 초기화
 realtime_monitor = RealtimeMonitor()
 conversation_exporter = ConversationExporter()
+conversation_summarizer = ConversationSummarizer(chatbot.session_manager)
 legal_refs = load_json("data/legal_references.json")
 faq_quality_checker = FAQQualityChecker(chatbot.faq_items, legal_refs)
 satisfaction_tracker = SatisfactionTracker()
@@ -130,6 +137,16 @@ alert_rule_engine = AlertRuleEngine(
 request_profiler = RequestProfiler()
 component_benchmark = ComponentBenchmark()
 
+# 마이그레이션 관리자 초기화
+migration_manager = MigrationManager()
+
+# 헬스 모니터 초기화
+health_monitor = HealthMonitor(
+    base_dir=BASE_DIR,
+    faq_items=chatbot.faq_items,
+    chat_logger=chat_logger,
+)
+
 # --- FAQ in-memory cache ---
 _faq_cache: dict = {}
 
@@ -154,6 +171,55 @@ def _get_audit_actor():
 def _get_client_ip():
     """Extract client IP from request."""
     return request.remote_addr or "unknown"
+
+
+# --- Advanced rate limiting middleware ---
+_RATE_LIMIT_EXEMPT_PATHS = {"/", "/api/health", "/static", "/manifest.json", "/sw.js"}
+
+
+@app.before_request
+def _check_advanced_rate_limit():
+    """Apply per-endpoint rate limits via AdvancedRateLimiter."""
+    if app.config.get("TESTING"):
+        return None
+    path = request.path
+    # Skip static / health endpoints
+    for exempt in _RATE_LIMIT_EXEMPT_PATHS:
+        if path == exempt or path.startswith(exempt + "/"):
+            return None
+
+    client_ip = request.remote_addr or "unknown"
+    allowed, remaining, reset_time = advanced_rate_limiter.check_rate_limit(
+        client_ip, path
+    )
+    # Store for after_request header injection
+    request._rl_remaining = remaining
+    request._rl_reset = reset_time
+
+    if not allowed:
+        retry_after = max(1, reset_time - int(time.time()))
+        response = jsonify({
+            "error": "요청이 너무 많습니다. 잠시 후 다시 시도해 주세요."
+        })
+        response.status_code = 429
+        response.headers["Retry-After"] = str(retry_after)
+        response.headers["X-RateLimit-Remaining"] = "0"
+        response.headers["X-RateLimit-Reset"] = str(reset_time)
+        return response
+
+    return None
+
+
+@app.after_request
+def _add_rate_limit_headers(response):
+    """Inject X-RateLimit-* headers on every response."""
+    remaining = getattr(request, "_rl_remaining", None)
+    reset_time = getattr(request, "_rl_reset", None)
+    if remaining is not None and remaining >= 0:
+        response.headers["X-RateLimit-Remaining"] = str(remaining)
+    if reset_time:
+        response.headers["X-RateLimit-Reset"] = str(reset_time)
+    return response
 
 
 # --- Response time middleware ---
@@ -1873,6 +1939,202 @@ def i18n_locale(lang):
     if not data:
         return jsonify({"error": f"Locale '{lang}' not found"}), 404
     return jsonify(data)
+
+
+# --- Advanced Rate Limit admin endpoints ---
+
+@app.route("/api/admin/rate-limits", methods=["GET"])
+def admin_rate_limits_get():
+    """Return current rate limit configuration."""
+    stats = advanced_rate_limiter.get_usage_stats()
+    return jsonify({
+        "endpoint_limits": stats["endpoint_limits"],
+        "default_daily_quota": stats["default_daily_quota"],
+    })
+
+
+@app.route("/api/admin/rate-limits", methods=["PUT"])
+def admin_rate_limits_update():
+    """Update rate limit configuration."""
+    data = request.get_json(silent=True)
+    if not data:
+        return jsonify({"error": "JSON body required"}), 400
+
+    updated = []
+    if "endpoint_limits" in data:
+        for pattern, rpm in data["endpoint_limits"].items():
+            if not isinstance(rpm, (int, float)) or rpm <= 0:
+                return jsonify({"error": f"Invalid limit for {pattern}"}), 400
+            advanced_rate_limiter.set_endpoint_limit(pattern, int(rpm))
+            updated.append(pattern)
+
+    if "default_daily_quota" in data:
+        quota = data["default_daily_quota"]
+        if not isinstance(quota, (int, float)) or quota <= 0:
+            return jsonify({"error": "Invalid daily quota"}), 400
+        advanced_rate_limiter._default_daily_quota = int(quota)
+
+    if "user_quotas" in data:
+        for api_key, limit in data["user_quotas"].items():
+            if not isinstance(limit, (int, float)) or limit <= 0:
+                return jsonify({"error": f"Invalid quota for {api_key}"}), 400
+            advanced_rate_limiter.set_user_quota(api_key, int(limit))
+
+    return jsonify({"status": "updated", "updated_endpoints": updated})
+
+
+@app.route("/api/admin/usage", methods=["GET"])
+def admin_usage():
+    """Return usage dashboard data: top users and endpoint stats."""
+    limit = request.args.get("limit", 10, type=int)
+    api_key = request.args.get("api_key")
+
+    stats = advanced_rate_limiter.get_usage_stats(api_key=api_key)
+    top_users = advanced_rate_limiter.get_top_users(limit=limit)
+
+    return jsonify({
+        "stats": stats,
+        "top_users": top_users,
+    })
+
+
+# --- Conversation Summary API endpoints ---
+
+@app.route("/api/session/<session_id>/summary", methods=["GET"])
+def session_summary(session_id):
+    """세션 대화 요약을 반환한다."""
+    summary = conversation_summarizer.summarize_session(session_id)
+    if summary is None:
+        return jsonify({"error": "세션을 찾을 수 없거나 만료되었습니다."}), 404
+    return jsonify(summary)
+
+
+@app.route("/api/admin/sessions/summaries", methods=["GET"])
+def admin_sessions_summaries():
+    """특정 날짜의 세션 일괄 요약을 반환한다."""
+    date_str = request.args.get("date", "")
+    # Collect all active session IDs
+    all_sessions = chatbot.session_manager._sessions
+    session_ids = []
+    for sid, session in all_sessions.items():
+        if date_str:
+            session_date = datetime.fromtimestamp(session.created_at).strftime("%Y-%m-%d")
+            if session_date == date_str:
+                session_ids.append(sid)
+        else:
+            session_ids.append(sid)
+    summaries = conversation_summarizer.summarize_batch(session_ids)
+    return jsonify({"date": date_str, "count": len(summaries), "summaries": summaries})
+
+
+@app.route("/api/admin/sessions/topics", methods=["GET"])
+def admin_sessions_topics():
+    """전체 세션에서 상위 대화 토픽을 반환한다."""
+    all_sessions = chatbot.session_manager._sessions
+    all_messages = []
+    for session in all_sessions.values():
+        all_messages.extend(session.history)
+    keyword_extractor = conversation_summarizer.keyword_extractor
+    topics = keyword_extractor.extract_topics(all_messages)
+    return jsonify({"count": len(topics), "topics": topics})
+
+
+# --- Database Migration API endpoints ---
+
+@app.route("/api/admin/migrations", methods=["GET"])
+def admin_migrations_status():
+    """Return current migration version and pending migrations."""
+    current = migration_manager.get_current_version()
+    pending = migration_manager.get_pending_migrations()
+    history = migration_manager.get_migration_history()
+    validation = migration_manager.validate_migrations()
+    return jsonify({
+        "current_version": current,
+        "pending": [{"version": v, "name": n} for v, n, _ in pending],
+        "history": history,
+        "valid": validation["valid"],
+        "errors": validation["errors"],
+    })
+
+
+@app.route("/api/admin/migrations/apply", methods=["POST"])
+def admin_migrations_apply():
+    """Apply pending migrations."""
+    data = request.get_json(silent=True) or {}
+    target_version = data.get("target_version")
+    try:
+        applied = migration_manager.migrate(target_version=target_version)
+        return jsonify({
+            "success": True,
+            "applied": applied,
+            "current_version": migration_manager.get_current_version(),
+        })
+    except Exception as e:
+        logger.error(f"Migration apply failed: {e}")
+        return jsonify({"error": str(e)}), 500
+
+
+@app.route("/api/admin/migrations/rollback", methods=["POST"])
+def admin_migrations_rollback():
+    """Rollback the last N migrations."""
+    data = request.get_json(silent=True) or {}
+    steps = data.get("steps", 1)
+    try:
+        rolled_back = migration_manager.rollback(steps=steps)
+        return jsonify({
+            "success": True,
+            "rolled_back": rolled_back,
+            "current_version": migration_manager.get_current_version(),
+        })
+    except Exception as e:
+        logger.error(f"Migration rollback failed: {e}")
+        return jsonify({"error": str(e)}), 500
+
+
+# --- Health Monitor API endpoints ---
+
+
+@app.route("/api/admin/health/detailed", methods=["GET"])
+def admin_health_detailed():
+    """전체 헬스 리포트를 반환한다."""
+    try:
+        report = health_monitor.check_all()
+        report["system_info"] = health_monitor.get_system_info()
+        return jsonify(report)
+    except Exception as e:
+        logger.error(f"Health check failed: {e}")
+        return jsonify({"error": "헬스 체크 실행 중 오류가 발생했습니다."}), 500
+
+
+@app.route("/api/admin/health/components", methods=["GET"])
+def admin_health_components():
+    """개별 구성 요소의 상태를 반환한다."""
+    try:
+        component = request.args.get("component")
+        if component:
+            check_map = {
+                "database": health_monitor.check_database,
+                "faq_data": health_monitor.check_faq_data,
+                "disk_space": health_monitor.check_disk_space,
+                "memory_usage": health_monitor.check_memory_usage,
+                "response_times": health_monitor.check_response_times,
+                "error_rate": health_monitor.check_error_rate,
+            }
+            check_fn = check_map.get(component)
+            if not check_fn:
+                return jsonify({"error": f"Unknown component: {component}"}), 400
+            return jsonify({component: check_fn()})
+        report = health_monitor.check_all()
+        return jsonify(report["components"])
+    except Exception as e:
+        logger.error(f"Component health check failed: {e}")
+        return jsonify({"error": "구성 요소 상태 확인 중 오류가 발생했습니다."}), 500
+
+
+@app.route("/health-dashboard")
+def health_dashboard():
+    """헬스 모니터링 대시보드 페이지를 반환한다."""
+    return send_from_directory(os.path.join(BASE_DIR, "web"), "health.html")
 
 
 def main():

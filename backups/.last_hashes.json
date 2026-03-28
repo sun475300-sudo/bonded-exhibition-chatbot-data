@@ -1,11 +1,11 @@
 {
   "data/alerts.db": {
     "size": 12288,
-    "sha256": "ce9a9dc575e4714f526c2a14c0539d24bac16ffd7a61ac816a3c00cdc7142414"
+    "sha256": "b7b051da8e539c70a6a4999127348d5eb324ffea36eba47e8aa8093ca74d0e4a"
   },
   "data/audit.db": {
-    "size": 65536,
-    "sha256": "12b25468e360bea977009f906e93073cb18cbcc40369b3b55b60d23d1b2b3e6a"
+    "size": 77824,
+    "sha256": "7750e3ab828393cc584fc2eae13d4e75a496de094c33f97435f64f0d052ef3c2"
   },
   "data/escalation_rules.json": {
     "size": 2262,
@@ -27,12 +27,16 @@
     "size": 3792,
     "sha256": "f06b07261036a8e8e68069b51c4b50a3c8f0287a38d4fa3294d5926ba16fb817"
   },
+  "data/migrations.db": {
+    "size": 8192,
+    "sha256": "62b0e0c80d5b9ab7348a33538b1bcd04661b39da44c434f03273f5546c221428"
+  },
   "data/tenants.db": {
     "size": 12288,
-    "sha256": "2abde403047954683ee8a57792861f937732e5cfa021ebf949cdd5392b38d0c3"
+    "sha256": "e40d82c13d2704597c68a74845917fe16d7a90cb5553c10e89857f1767b748e3"
   },
   "data/webhooks.db": {
-    "size": 86016,
-    "sha256": "0791d72db4219626b51fa7abc1ee6f45d8542abd64fcae1ce646ab645fc3de11"
+    "size": 118784,
+    "sha256": "de4bb52fd37194c8a2e3992716dfeda7984250e4b6537b3bfa7b3125ce2449e1"
   }
 }

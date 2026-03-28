@@ -1,0 +1,320 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>시스템 헬스 대시보드 - 보세전시장 챗봇</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+            background: #1a1d23;
+            color: #e0e0e0;
+            line-height: 1.6;
+        }
+        .header {
+            background: #1a3a5c;
+            color: #fff;
+            padding: 1rem 2rem;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        .header h1 { font-size: 1.3rem; }
+        .header-right { display: flex; align-items: center; gap: 1rem; }
+        .header a { color: #a8d0f0; text-decoration: none; font-size: 0.9rem; }
+        .auto-refresh-label { font-size: 0.8rem; color: #a8d0f0; }
+        .container { max-width: 1200px; margin: 0 auto; padding: 1.5rem; }
+
+        /* Overall status banner */
+        .overall-status {
+            border-radius: 8px;
+            padding: 1.5rem 2rem;
+            margin-bottom: 1.5rem;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+        }
+        .overall-status.healthy { background: #1b4332; border: 1px solid #2d6a4f; }
+        .overall-status.degraded { background: #553a08; border: 1px solid #b8860b; }
+        .overall-status.unhealthy { background: #5c1a1a; border: 1px solid #c0392b; }
+        .overall-status .status-label { font-size: 1.5rem; font-weight: 700; }
+        .overall-status.healthy .status-label { color: #52c41a; }
+        .overall-status.degraded .status-label { color: #faad14; }
+        .overall-status.unhealthy .status-label { color: #ff4d4f; }
+        .overall-status .status-meta { text-align: right; font-size: 0.85rem; color: #aaa; }
+
+        /* Stats grid */
+        .stats-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+            gap: 1rem;
+            margin-bottom: 1.5rem;
+        }
+        .stat-card {
+            background: #22262e;
+            border-radius: 8px;
+            padding: 1.2rem;
+            border: 1px solid #333;
+        }
+        .stat-card .label { font-size: 0.8rem; color: #888; margin-bottom: 0.3rem; }
+        .stat-card .value { font-size: 1.6rem; font-weight: 700; color: #fff; }
+
+        /* Component cards */
+        .panel {
+            background: #22262e;
+            border-radius: 8px;
+            padding: 1.2rem;
+            border: 1px solid #333;
+            margin-bottom: 1.5rem;
+        }
+        .panel h2 { font-size: 1.1rem; margin-bottom: 1rem; color: #a8d0f0; }
+
+        .component-list { list-style: none; }
+        .component-item {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 0.8rem 1rem;
+            border-bottom: 1px solid #333;
+            cursor: pointer;
+            transition: background 0.2s;
+        }
+        .component-item:hover { background: #2a2e36; }
+        .component-item:last-child { border-bottom: none; }
+        .component-left { display: flex; align-items: center; gap: 0.8rem; }
+        .status-dot {
+            width: 12px; height: 12px; border-radius: 50%;
+            flex-shrink: 0;
+        }
+        .status-dot.healthy { background: #52c41a; box-shadow: 0 0 6px #52c41a; }
+        .status-dot.degraded { background: #faad14; box-shadow: 0 0 6px #faad14; }
+        .status-dot.unhealthy { background: #ff4d4f; box-shadow: 0 0 6px #ff4d4f; }
+        .component-name { font-weight: 600; font-size: 0.95rem; }
+        .component-message { font-size: 0.85rem; color: #999; }
+        .component-details {
+            display: none;
+            padding: 0.8rem 1rem 0.8rem 2.5rem;
+            background: #1a1d23;
+            font-size: 0.82rem;
+            color: #aaa;
+            border-bottom: 1px solid #333;
+        }
+        .component-details.open { display: block; }
+        .detail-row { display: flex; justify-content: space-between; padding: 0.2rem 0; }
+        .detail-key { color: #888; }
+        .detail-value { color: #ddd; }
+
+        /* System info */
+        .sys-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+            gap: 0.5rem;
+        }
+        .sys-row {
+            display: flex;
+            justify-content: space-between;
+            padding: 0.4rem 0;
+            border-bottom: 1px solid #2a2e36;
+        }
+        .sys-key { color: #888; font-size: 0.85rem; }
+        .sys-value { color: #ddd; font-size: 0.85rem; font-weight: 500; }
+
+        /* Uptime bar */
+        .uptime-bar-container { margin-top: 1rem; }
+        .uptime-percentage {
+            font-size: 2rem;
+            font-weight: 700;
+            margin-bottom: 0.5rem;
+        }
+        .uptime-bar {
+            height: 8px;
+            background: #333;
+            border-radius: 4px;
+            overflow: hidden;
+        }
+        .uptime-fill {
+            height: 100%;
+            border-radius: 4px;
+            transition: width 0.6s ease;
+        }
+        .uptime-fill.high { background: #52c41a; }
+        .uptime-fill.mid { background: #faad14; }
+        .uptime-fill.low { background: #ff4d4f; }
+
+        .loading { text-align: center; padding: 3rem; color: #666; font-size: 1.1rem; }
+
+        @media (max-width: 600px) {
+            .header { flex-direction: column; gap: 0.5rem; }
+            .overall-status { flex-direction: column; text-align: center; gap: 0.5rem; }
+            .overall-status .status-meta { text-align: center; }
+        }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <h1>System Health Dashboard</h1>
+        <div class="header-right">
+            <span class="auto-refresh-label" id="refresh-timer">Auto-refresh: 10s</span>
+            <a href="/admin">Admin</a>
+        </div>
+    </div>
+
+    <div class="container">
+        <div id="content">
+            <div class="loading">Loading health data...</div>
+        </div>
+    </div>
+
+    <script>
+        let refreshInterval = null;
+        let countdown = 10;
+        let uptimeHistory = [];
+
+        async function fetchHealth() {
+            try {
+                const [healthRes, sysRes] = await Promise.all([
+                    fetch('/api/admin/health/detailed'),
+                    fetch('/api/admin/health/components')
+                ]);
+                const health = await healthRes.json();
+                const components = await sysRes.json();
+                renderDashboard(health, components);
+            } catch (e) {
+                document.getElementById('content').innerHTML =
+                    '<div class="loading">Failed to load health data. Retrying...</div>';
+            }
+        }
+
+        function renderDashboard(health, compData) {
+            // Track uptime
+            uptimeHistory.push(health.status === 'healthy' ? 1 : 0);
+            if (uptimeHistory.length > 360) uptimeHistory = uptimeHistory.slice(-360);
+            const uptimePct = uptimeHistory.length > 0
+                ? Math.round((uptimeHistory.reduce((a, b) => a + b, 0) / uptimeHistory.length) * 100)
+                : 100;
+            const uptimeClass = uptimePct >= 99 ? 'high' : uptimePct >= 95 ? 'mid' : 'low';
+
+            const statusText = {
+                healthy: 'HEALTHY',
+                degraded: 'DEGRADED',
+                unhealthy: 'UNHEALTHY'
+            };
+
+            const componentNames = {
+                database: 'Database',
+                faq_data: 'FAQ Data',
+                disk_space: 'Disk Space',
+                memory_usage: 'Memory Usage',
+                response_times: 'Response Times',
+                error_rate: 'Error Rate'
+            };
+
+            const sysInfo = health.system_info || {};
+            const components = health.components || {};
+
+            let componentsHtml = '';
+            for (const [key, comp] of Object.entries(components)) {
+                const detailsHtml = Object.entries(comp.details || {}).map(([k, v]) => {
+                    const val = Array.isArray(v) ? v.join(', ') : (typeof v === 'object' ? JSON.stringify(v) : v);
+                    return `<div class="detail-row"><span class="detail-key">${k}</span><span class="detail-value">${val}</span></div>`;
+                }).join('');
+
+                componentsHtml += `
+                    <li>
+                        <div class="component-item" onclick="toggleDetails('${key}')">
+                            <div class="component-left">
+                                <span class="status-dot ${comp.status}"></span>
+                                <span class="component-name">${componentNames[key] || key}</span>
+                            </div>
+                            <span class="component-message">${comp.message}</span>
+                        </div>
+                        <div class="component-details" id="details-${key}">${detailsHtml}</div>
+                    </li>`;
+            }
+
+            const html = `
+                <div class="overall-status ${health.status}">
+                    <div>
+                        <div class="status-label">${statusText[health.status] || health.status}</div>
+                        <div style="font-size:0.9rem;color:#ccc;">${health.healthy_components}/${health.total_components} components healthy</div>
+                    </div>
+                    <div class="status-meta">
+                        <div>Last check: ${health.timestamp || 'N/A'}</div>
+                    </div>
+                </div>
+
+                <div class="stats-grid">
+                    <div class="stat-card">
+                        <div class="label">Components</div>
+                        <div class="value">${health.total_components || 0}</div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="label">Healthy</div>
+                        <div class="value" style="color:#52c41a">${health.healthy_components || 0}</div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="label">FAQ Count</div>
+                        <div class="value">${sysInfo.faq_count || 0}</div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="label">Uptime</div>
+                        <div class="value">${sysInfo.uptime_formatted || 'N/A'}</div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="label">Python</div>
+                        <div class="value" style="font-size:1.2rem">${sysInfo.python_version || 'N/A'}</div>
+                    </div>
+                </div>
+
+                <div class="panel">
+                    <h2>Component Status</h2>
+                    <ul class="component-list">${componentsHtml}</ul>
+                </div>
+
+                <div class="panel">
+                    <h2>Historical Uptime</h2>
+                    <div class="uptime-bar-container">
+                        <div class="uptime-percentage" style="color:${uptimePct >= 99 ? '#52c41a' : uptimePct >= 95 ? '#faad14' : '#ff4d4f'}">${uptimePct}%</div>
+                        <div class="uptime-bar">
+                            <div class="uptime-fill ${uptimeClass}" style="width:${uptimePct}%"></div>
+                        </div>
+                        <div style="font-size:0.8rem;color:#666;margin-top:0.4rem;">Based on ${uptimeHistory.length} checks (refreshes every 10s)</div>
+                    </div>
+                </div>
+
+                <div class="panel">
+                    <h2>System Information</h2>
+                    <div class="sys-grid">
+                        ${Object.entries(sysInfo).map(([k, v]) =>
+                            `<div class="sys-row"><span class="sys-key">${k}</span><span class="sys-value">${v}</span></div>`
+                        ).join('')}
+                    </div>
+                </div>
+            `;
+
+            document.getElementById('content').innerHTML = html;
+        }
+
+        function toggleDetails(key) {
+            const el = document.getElementById('details-' + key);
+            if (el) el.classList.toggle('open');
+        }
+
+        function startAutoRefresh() {
+            countdown = 10;
+            fetchHealth();
+            refreshInterval = setInterval(() => {
+                countdown--;
+                document.getElementById('refresh-timer').textContent = `Auto-refresh: ${countdown}s`;
+                if (countdown <= 0) {
+                    countdown = 10;
+                    fetchHealth();
+                }
+            }, 1000);
+        }
+
+        startAutoRefresh();
+    </script>
+</body>
+</html>

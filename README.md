@@ -11,12 +11,12 @@
 | FAQ | 50개 (v3.0.0) |
 | 질문 카테고리 | 10개 |
 | 에스컬레이션 규칙 | 5개 |
-| 테스트 | 1,030개 (전체 PASS) |
-| 소스 코드 | 11,723줄 (src/ + web_server + simulator) |
-| 테스트 코드 | 10,631줄 |
-| 소스 파일 | 47개 |
-| 테스트 파일 | 42개 |
-| 커밋 | 40개 |
+| 테스트 | 1,156개 (전체 PASS) |
+| 소스 코드 | 13,344줄 (src/ + web_server + simulator) |
+| 테스트 코드 | 12,051줄 |
+| 소스 파일 | 51개 |
+| 테스트 파일 | 46개 |
+| 커밋 | 42개 |
 
 ---
 
@@ -236,7 +236,7 @@ docker-compose up -d
 
 ### 테스트
 ```bash
-python -m pytest tests/ -v       # 1,030개 테스트 전체 PASS
+python -m pytest tests/ -v       # 1,156개 테스트 전체 PASS
 
 # 특정 모듈만
 python -m pytest tests/test_chatbot.py -v
@@ -308,7 +308,7 @@ bonded-exhibition-chatbot-data/
 │   ├── profiler.py                # 성능 프로파일링 (cProfile)
 │   ├── alert_center.py            # 알림 센터 (규칙 엔진, 임계값)
 │   └── utils.py                   # 유틸리티
-├── tests/                         # 1,030개 테스트
+├── tests/                         # 1,156개 테스트
 │   ├── test_chatbot.py            # 통합 테스트
 │   ├── test_classifier.py         # 분류기
 │   ├── test_similarity.py         # TF-IDF 매칭
@@ -483,6 +483,8 @@ timeline
         관리 + 확장 : FAQ CRUD, 분석리포트, 멀티테넌트, 웹훅
     section Phase 39-42
         운영 고도화 : 감사로그, i18n 6개국어, 프로파일링, 알림센터
+    section Phase 43-46
+        확장 완성 : RateLimit v2, DB마이그레이션, 헬스대시보드, 대화요약
 ```
 
 ## 업데이트 내역
@@ -499,6 +501,7 @@ timeline
 | v7.0.0 | Phase 31-34 (OpenAPI/Swagger, 백업 자동화, 부하 테스트/벤치마크, 네이버 톡톡) |
 | v8.0.0 | Phase 35-38 (FAQ 관리 UI, 분석 리포트, 멀티 테넌트, 웹훅 시스템) |
 | v9.0.0 | Phase 39-42 (감사 로그, i18n 6개국어, 성능 프로파일링, 알림 센터) |
+| v10.0.0 | Phase 43-46 (Rate Limiting v2, DB 마이그레이션, 헬스 대시보드, 대화 요약) |
 
 ## 기술 스택
 
