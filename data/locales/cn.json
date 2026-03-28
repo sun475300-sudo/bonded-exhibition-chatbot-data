@@ -1,0 +1,36 @@
+{
+  "ui": {
+    "header": "保税展示场咨询聊天机器人",
+    "send_button": "发送",
+    "input_placeholder": "请输入您的问题...",
+    "tooltip_new_chat": "开始新对话",
+    "tooltip_export": "导出对话",
+    "tooltip_feedback": "发送反馈",
+    "loading": "正在生成回复..."
+  },
+  "messages": {
+    "welcome": "您好！我是保税展示场咨询聊天机器人。请问有什么可以帮您？",
+    "error": "抱歉，发生错误。请重试。",
+    "unknown_query": "抱歉，未找到相关答案。请尝试其他问题。",
+    "session_expired": "会话已过期。请开始新对话。",
+    "rate_limited": "请求过多。请稍后再试。"
+  },
+  "categories": {
+    "GENERAL": "一般指南",
+    "IMPORT_EXPORT": "进出口",
+    "SALES": "现场销售",
+    "SAMPLE": "样品",
+    "FOOD_TASTING": "试吃/试饮",
+    "LICENSE": "许可/设营",
+    "EXHIBITION": "展览运营",
+    "DOCUMENTS": "文件/申报",
+    "PENALTIES": "违规/处罚",
+    "CONTACT": "联系方式"
+  },
+  "sections": {
+    "conclusion": "结论",
+    "description": "说明",
+    "legal_basis": "法律依据",
+    "disclaimer": "免责声明"
+  }
+}

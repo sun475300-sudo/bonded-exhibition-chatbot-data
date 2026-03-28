@@ -1,0 +1,36 @@
+{
+  "ui": {
+    "header": "保税展示場お問い合わせチャットボット",
+    "send_button": "送信",
+    "input_placeholder": "質問を入力してください...",
+    "tooltip_new_chat": "新しいチャットを開始",
+    "tooltip_export": "会話をエクスポート",
+    "tooltip_feedback": "フィードバックを送信",
+    "loading": "回答を生成中..."
+  },
+  "messages": {
+    "welcome": "こんにちは！保税展示場お問い合わせチャットボットです。何かお手伝いできますか？",
+    "error": "申し訳ございません。エラーが発生しました。もう一度お試しください。",
+    "unknown_query": "申し訳ございません。ご質問に対する回答が見つかりませんでした。別の質問をお試しください。",
+    "session_expired": "セッションが期限切れです。新しい会話を開始してください。",
+    "rate_limited": "リクエストが多すぎます。しばらくしてからもう一度お試しください。"
+  },
+  "categories": {
+    "GENERAL": "一般案内",
+    "IMPORT_EXPORT": "搬出入",
+    "SALES": "現場販売",
+    "SAMPLE": "見本品",
+    "FOOD_TASTING": "試食・試飲",
+    "LICENSE": "特許/設営",
+    "EXHIBITION": "展示運営",
+    "DOCUMENTS": "書類/申告",
+    "PENALTIES": "違反/制裁",
+    "CONTACT": "お問い合わせ先"
+  },
+  "sections": {
+    "conclusion": "結論",
+    "description": "説明",
+    "legal_basis": "法的根拠",
+    "disclaimer": "免責事項"
+  }
+}

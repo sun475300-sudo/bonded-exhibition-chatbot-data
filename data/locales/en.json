@@ -1,0 +1,36 @@
+{
+  "ui": {
+    "header": "Bonded Exhibition Chatbot",
+    "send_button": "Send",
+    "input_placeholder": "Type your question...",
+    "tooltip_new_chat": "Start new chat",
+    "tooltip_export": "Export conversation",
+    "tooltip_feedback": "Send feedback",
+    "loading": "Generating response..."
+  },
+  "messages": {
+    "welcome": "Hello! I am the Bonded Exhibition Chatbot. How can I help you?",
+    "error": "Sorry, an error occurred. Please try again.",
+    "unknown_query": "Sorry, I could not find an answer to your question. Please try a different question.",
+    "session_expired": "Your session has expired. Please start a new conversation.",
+    "rate_limited": "Too many requests. Please try again later."
+  },
+  "categories": {
+    "GENERAL": "General Information",
+    "IMPORT_EXPORT": "Import/Export",
+    "SALES": "On-site Sales",
+    "SAMPLE": "Samples",
+    "FOOD_TASTING": "Food Tasting",
+    "LICENSE": "License/Permit",
+    "EXHIBITION": "Exhibition Operations",
+    "DOCUMENTS": "Documents/Declarations",
+    "PENALTIES": "Violations/Penalties",
+    "CONTACT": "Contact Information"
+  },
+  "sections": {
+    "conclusion": "Conclusion",
+    "description": "Description",
+    "legal_basis": "Legal Basis",
+    "disclaimer": "Disclaimer"
+  }
+}
