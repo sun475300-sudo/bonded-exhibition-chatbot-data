@@ -2,6 +2,29 @@
 
 모든 주요 변경 사항을 기록합니다.
 
+## [4.0.0] - 2026-03-28
+
+### Added
+- Phase 13: 대화 품질 고도화
+  - 동의어 사전 (synonym_resolver): 30개 동의어 매핑, 쿼리 확장
+  - 오타 교정 (spell_corrector): 레벤슈타인 거리 + 자모 분해, 153개 도메인 용어
+  - 모호 질문 되묻기 (clarification): 짧은/모호 질문 감지, 명확화 질문 생성
+  - 답변 만족도 추적 (satisfaction_tracker): 세션 내 재질문 감지, 품질 점수
+- Phase 14: 고급 검색 엔진
+  - 한국어 토크나이저 (korean_tokenizer): 조사 제거, 도메인 용어 보존, n-gram
+  - BM25 랭킹 (bm25_ranker): k1=1.5, b=0.75, TF-IDF 보완
+  - 관련 질문 추천 (related_faq): Jaccard 유사도 기반, 카테고리 이웃
+- Phase 15: 실시간 모니터링 (realtime_monitor)
+  - 링 버퍼 이벤트 기록, 분/시간 통계, 임계값 알림 3종
+- Phase 16: FAQ 품질 자동 검사 (faq_quality_checker)
+  - 중복 감지, 키워드 커버리지, 법령 정합성, 답변 일관성, 카테고리 균형
+- Phase 17: 대화 내보내기 (conversation_export)
+  - 텍스트/JSON/CSV/HTML 4가지 형식 지원
+- Phase 18: 플러그인 시스템 (plugin_system)
+  - 6개 훅 포인트, 우선순위 파이프라인 패턴
+- 신규 API: /api/admin/monitor, /api/admin/quality, /api/session/export, /api/related
+- chatbot.py에 전처리 파이프라인 통합 (오타교정 → 동의어확장)
+
 ## [3.0.0] - 2026-03-27
 
 ### Added

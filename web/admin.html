@@ -187,12 +187,178 @@
             font-size: 1.2rem; font-weight: 700; color: #1a3a5c;
             margin: 2rem 0 1rem; padding-bottom: 0.5rem; border-bottom: 2px solid #1a3a5c;
         }
+
+        /* Real-time monitoring */
+        .realtime-stats-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+            gap: 0.8rem;
+            margin-bottom: 1rem;
+        }
+        .realtime-stat {
+            background: #f8f9fa;
+            border-radius: 6px;
+            padding: 0.8rem;
+            text-align: center;
+        }
+        .realtime-stat .rt-label { font-size: 0.8rem; color: #666; margin-bottom: 0.2rem; }
+        .realtime-stat .rt-value { font-size: 1.6rem; font-weight: 700; color: #1a3a5c; }
+        .realtime-stat .rt-value.rt-alert { color: #e74c3c; }
+        .hourly-bar-chart {
+            display: flex;
+            align-items: flex-end;
+            gap: 2px;
+            height: 100px;
+            margin-top: 0.8rem;
+            padding: 0 0.2rem;
+        }
+        .hourly-bar {
+            flex: 1;
+            background: #3498db;
+            border-radius: 2px 2px 0 0;
+            min-height: 2px;
+            transition: height 0.4s ease;
+            position: relative;
+        }
+        .hourly-bar:hover { background: #2980b9; }
+        .hourly-bar:hover::after {
+            content: attr(data-tip);
+            position: absolute; bottom: 100%; left: 50%; transform: translateX(-50%);
+            background: #333; color: #fff; padding: 2px 6px; border-radius: 3px;
+            font-size: 0.7rem; white-space: nowrap; z-index: 10;
+        }
+        .hourly-labels {
+            display: flex;
+            gap: 2px;
+            font-size: 0.6rem;
+            color: #999;
+            margin-top: 2px;
+            padding: 0 0.2rem;
+        }
+        .hourly-labels span { flex: 1; text-align: center; }
+        .alert-banner {
+            background: #fde8e8;
+            color: #c0392b;
+            padding: 0.5rem 0.8rem;
+            border-radius: 4px;
+            font-size: 0.85rem;
+            margin-bottom: 0.5rem;
+        }
+        .pulse-dot {
+            display: inline-block;
+            width: 8px; height: 8px;
+            background: #27ae60;
+            border-radius: 50%;
+            margin-right: 6px;
+            animation: pulse 1.5s infinite;
+        }
+        @keyframes pulse {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.3; }
+        }
+
+        /* FAQ quality cards */
+        .quality-card {
+            border-radius: 6px;
+            padding: 0.8rem 1rem;
+            margin-bottom: 0.6rem;
+            border-left: 4px solid;
+        }
+        .quality-card.severity-good {
+            background: #e8f8f0;
+            border-left-color: #27ae60;
+        }
+        .quality-card.severity-warning {
+            background: #fef3e2;
+            border-left-color: #e67e22;
+        }
+        .quality-card.severity-critical {
+            background: #fde8e8;
+            border-left-color: #e74c3c;
+        }
+        .quality-card .qc-title {
+            font-weight: 600;
+            font-size: 0.9rem;
+            margin-bottom: 0.3rem;
+        }
+        .quality-card .qc-detail {
+            font-size: 0.8rem;
+            color: #555;
+        }
+        .quality-score-bar {
+            height: 8px;
+            background: #e9ecef;
+            border-radius: 4px;
+            overflow: hidden;
+            margin: 0.5rem 0;
+        }
+        .quality-score-fill {
+            height: 100%;
+            border-radius: 4px;
+            transition: width 0.6s ease;
+        }
+
+        /* Satisfaction trend */
+        .satisfaction-score-display {
+            text-align: center;
+            padding: 1rem 0;
+        }
+        .satisfaction-score-display .score-big {
+            font-size: 3rem;
+            font-weight: 700;
+            color: #1a3a5c;
+        }
+        .satisfaction-score-display .trend-indicator {
+            font-size: 1.2rem;
+            margin-left: 0.5rem;
+        }
+        .trend-up { color: #27ae60; }
+        .trend-down { color: #e74c3c; }
+        .trend-stable { color: #e67e22; }
+        .response-type-bars {
+            margin-top: 0.8rem;
+        }
+        .response-type-bars .rt-bar-row {
+            display: flex;
+            align-items: center;
+            margin-bottom: 0.4rem;
+        }
+        .response-type-bars .rt-bar-label {
+            width: 100px;
+            font-size: 0.8rem;
+            color: #555;
+            text-align: right;
+            padding-right: 0.5rem;
+            flex-shrink: 0;
+        }
+        .response-type-bars .rt-bar-track {
+            flex: 1;
+            background: #e9ecef;
+            border-radius: 4px;
+            height: 18px;
+            overflow: hidden;
+        }
+        .response-type-bars .rt-bar-fill {
+            height: 100%;
+            border-radius: 4px;
+            transition: width 0.6s ease;
+        }
+        .response-type-bars .rt-bar-count {
+            width: 40px;
+            font-size: 0.8rem;
+            padding-left: 0.4rem;
+            color: #555;
+        }
     </style>
 </head>
 <body>
     <div class="header">
         <h1>보세전시장 챗봇 관리자 대시보드</h1>
-        <a href="/">챗봇으로 돌아가기</a>
+        <div style="display:flex;align-items:center;gap:1rem;">
+            <span id="currentUser" style="font-size:0.85rem;color:#a8d0f0;"></span>
+            <a href="/">챗봇으로 돌아가기</a>
+            <button onclick="logout()" style="background:#e74c3c;color:#fff;border:none;border-radius:4px;padding:0.3rem 0.8rem;cursor:pointer;font-size:0.85rem;">로그아웃</button>
+        </div>
     </div>
 
     <div class="container">
@@ -302,6 +468,99 @@
             </div>
         </div>
 
+        <!-- 실시간 모니터링 섹션 -->
+        <div class="section-title"><span class="pulse-dot"></span>실시간 모니터링</div>
+
+        <div class="panel">
+            <h2>라이브 통계</h2>
+            <div id="realtimeAlerts"></div>
+            <div class="realtime-stats-grid" id="realtimeStats">
+                <div class="realtime-stat">
+                    <div class="rt-label">분당 질문 수</div>
+                    <div class="rt-value" id="rtQueriesMin">-</div>
+                </div>
+                <div class="realtime-stat">
+                    <div class="rt-label">평균 응답시간</div>
+                    <div class="rt-value" id="rtAvgResponse">-</div>
+                </div>
+                <div class="realtime-stat">
+                    <div class="rt-label">활성 세션</div>
+                    <div class="rt-value" id="rtActiveSessions">-</div>
+                </div>
+                <div class="realtime-stat">
+                    <div class="rt-label">시간당 질문</div>
+                    <div class="rt-value" id="rtQueriesHour">-</div>
+                </div>
+                <div class="realtime-stat">
+                    <div class="rt-label">오류율</div>
+                    <div class="rt-value" id="rtErrorRate">-</div>
+                </div>
+            </div>
+            <h3 style="font-size:0.95rem; color:#1a3a5c; margin-top:1rem;">시간별 질문 추이 (24시간)</h3>
+            <div class="hourly-bar-chart" id="realtimeHourlyChart"></div>
+            <div class="hourly-labels" id="realtimeHourlyLabels"></div>
+        </div>
+
+        <!-- FAQ 품질 대시보드 -->
+        <div class="section-title">FAQ 품질 대시보드</div>
+
+        <div class="panel">
+            <h2>품질 점수</h2>
+            <div style="display:flex; align-items:center; gap:1.5rem; margin-bottom:1rem;">
+                <div style="text-align:center;">
+                    <div style="font-size:2.5rem; font-weight:700; color:#1a3a5c;" id="fqScoreValue">-</div>
+                    <div style="font-size:0.85rem; color:#666;">전체 점수</div>
+                </div>
+                <div style="flex:1;">
+                    <div class="quality-score-bar">
+                        <div class="quality-score-fill" id="fqScoreBar" style="width:0%; background:#27ae60;"></div>
+                    </div>
+                    <div style="font-size:0.8rem; color:#888;" id="fqPassedText">검사 중...</div>
+                </div>
+            </div>
+            <div id="fqIssueCards">
+                <div class="loading">데이터 로딩 중...</div>
+            </div>
+        </div>
+
+        <!-- 만족도 트렌드 섹션 -->
+        <div class="section-title">만족도 트렌드</div>
+
+        <div class="two-col">
+            <div class="panel">
+                <h2>전체 만족도</h2>
+                <div class="satisfaction-score-display">
+                    <span class="score-big" id="satScore">-</span>
+                    <span class="trend-indicator" id="satTrend"></span>
+                </div>
+                <div class="stats-grid" style="margin-bottom:0;">
+                    <div class="stat-card">
+                        <div class="label">총 질문 수</div>
+                        <div class="value" id="satTotal" style="font-size:1.3rem;">-</div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="label">재질문 비율</div>
+                        <div class="value warning" id="satReAskRate" style="font-size:1.3rem;">-</div>
+                    </div>
+                </div>
+                <h3 style="font-size:0.95rem; color:#1a3a5c; margin-top:1rem;">응답 유형 분포</h3>
+                <div class="response-type-bars" id="satResponseTypes"></div>
+            </div>
+
+            <div class="panel">
+                <h2>낮은 만족도 응답</h2>
+                <p class="hint">만족도 점수가 낮은 응답 목록입니다. 답변 개선을 검토하세요.</p>
+                <div class="table-wrap" style="margin-top:0.8rem;">
+                    <table>
+                        <thead><tr><th>질문</th><th>유형</th><th>점수</th><th>재질문</th></tr></thead>
+                        <tbody id="satLowestBody">
+                            <tr><td colspan="4" class="loading">로딩 중...</td></tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+
         <!-- 분석/인텔리전스 섹션 -->
         <div class="section-title">분석 / 인텔리전스</div>
 
@@ -366,6 +625,64 @@
     <script>
         const API_BASE = "";
 
+        // --- Auth token management ---
+        function getToken() {
+            return localStorage.getItem("admin_token");
+        }
+
+        function authHeaders() {
+            const token = getToken();
+            const headers = {};
+            if (token) {
+                headers["Authorization"] = "Bearer " + token;
+            }
+            return headers;
+        }
+
+        function authFetch(url, options) {
+            options = options || {};
+            options.headers = Object.assign({}, options.headers || {}, authHeaders());
+            return fetch(url, options).then(res => {
+                if (res.status === 401) {
+                    localStorage.removeItem("admin_token");
+                    window.location.href = "/login";
+                }
+                return res;
+            });
+        }
+
+        function logout() {
+            localStorage.removeItem("admin_token");
+            window.location.href = "/login";
+        }
+
+        // Check auth on page load
+        (function checkAuth() {
+            const token = getToken();
+            if (!token) {
+                window.location.href = "/login";
+                return;
+            }
+            // Verify token is still valid
+            fetch("/api/auth/me", {
+                headers: { "Authorization": "Bearer " + token }
+            }).then(res => {
+                if (!res.ok) {
+                    localStorage.removeItem("admin_token");
+                    window.location.href = "/login";
+                } else {
+                    return res.json();
+                }
+            }).then(data => {
+                if (data && data.username) {
+                    document.getElementById("currentUser").textContent = data.username;
+                }
+            }).catch(() => {
+                localStorage.removeItem("admin_token");
+                window.location.href = "/login";
+            });
+        })();
+
         function escapeHtml(text) {
             if (!text) return "";
             const div = document.createElement("div");
@@ -375,7 +692,7 @@
 
         async function loadStats() {
             try {
-                const res = await fetch(API_BASE + "/api/admin/stats");
+                const res = await authFetch(API_BASE + "/api/admin/stats");
                 const data = await res.json();
 
                 document.getElementById("totalQueries").textContent = data.total_queries;
@@ -416,7 +733,7 @@
 
         async function loadLogs() {
             try {
-                const res = await fetch(API_BASE + "/api/admin/logs?limit=50");
+                const res = await authFetch(API_BASE + "/api/admin/logs?limit=50");
                 const data = await res.json();
                 const tbody = document.getElementById("logsBody");
 
@@ -442,7 +759,7 @@
 
         async function loadUnmatched() {
             try {
-                const res = await fetch(API_BASE + "/api/admin/unmatched?limit=20");
+                const res = await authFetch(API_BASE + "/api/admin/unmatched?limit=20");
                 const data = await res.json();
                 const tbody = document.getElementById("unmatchedBody");
 
@@ -465,7 +782,7 @@
 
         async function loadFeedback() {
             try {
-                const res = await fetch(API_BASE + "/api/admin/feedback");
+                const res = await authFetch(API_BASE + "/api/admin/feedback");
                 const data = await res.json();
                 const stats = data.stats;
 
@@ -494,7 +811,7 @@
 
         async function loadAnalytics() {
             try {
-                const res = await fetch(API_BASE + "/api/admin/analytics");
+                const res = await authFetch(API_BASE + "/api/admin/analytics");
                 const data = await res.json();
 
                 // 품질 점수 게이지
@@ -551,7 +868,7 @@
 
         async function loadWeeklyReport() {
             try {
-                const res = await fetch(API_BASE + "/api/admin/report");
+                const res = await authFetch(API_BASE + "/api/admin/report");
                 const data = await res.json();
                 document.getElementById("weeklyReportText").textContent = data.report || "리포트 없음";
             } catch (e) {
@@ -561,7 +878,7 @@
 
         async function loadFAQPipeline() {
             try {
-                const res = await fetch(API_BASE + "/api/admin/faq-pipeline");
+                const res = await authFetch(API_BASE + "/api/admin/faq-pipeline");
                 const data = await res.json();
                 const container = document.getElementById("pipelineCandidates");
 
@@ -586,7 +903,7 @@
 
         async function approveCandidate(id) {
             try {
-                const res = await fetch(API_BASE + "/api/admin/faq-pipeline/approve", {
+                const res = await authFetch(API_BASE + "/api/admin/faq-pipeline/approve", {
                     method: "POST",
                     headers: { "Content-Type": "application/json" },
                     body: JSON.stringify({ candidate_id: id })
@@ -605,7 +922,7 @@
 
         async function rejectCandidate(id) {
             try {
-                const res = await fetch(API_BASE + "/api/admin/faq-pipeline/reject", {
+                const res = await authFetch(API_BASE + "/api/admin/faq-pipeline/reject", {
                     method: "POST",
                     headers: { "Content-Type": "application/json" },
                     body: JSON.stringify({ candidate_id: id })
@@ -622,17 +939,222 @@
             }
         }
 
+        // --- 실시간 모니터링 ---
+        async function loadRealtime() {
+            try {
+                const res = await authFetch(API_BASE + "/api/admin/realtime");
+                const data = await res.json();
+
+                document.getElementById("rtQueriesMin").textContent = data.queries_per_minute;
+                document.getElementById("rtAvgResponse").textContent = data.avg_response_time_ms + "ms";
+                document.getElementById("rtActiveSessions").textContent = data.active_sessions;
+                document.getElementById("rtQueriesHour").textContent = data.queries_last_hour;
+
+                const errEl = document.getElementById("rtErrorRate");
+                const errPct = (data.error_rate * 100).toFixed(1) + "%";
+                errEl.textContent = errPct;
+                errEl.className = data.error_rate > 0.05 ? "rt-value rt-alert" : "rt-value";
+
+                // Alerts
+                const alertContainer = document.getElementById("realtimeAlerts");
+                if (data.alerts && data.alerts.length > 0) {
+                    alertContainer.innerHTML = data.alerts.map(a =>
+                        '<div class="alert-banner">' + escapeHtml(a.message) + '</div>'
+                    ).join("");
+                } else {
+                    alertContainer.innerHTML = "";
+                }
+
+                // Hourly bar chart
+                renderRealtimeHourly(data.hourly_counts || []);
+            } catch (e) {
+                console.error("실시간 모니터링 로딩 실패:", e);
+            }
+        }
+
+        function renderRealtimeHourly(counts) {
+            const chart = document.getElementById("realtimeHourlyChart");
+            const labels = document.getElementById("realtimeHourlyLabels");
+
+            if (!counts || counts.length === 0) {
+                chart.innerHTML = "<div class='loading'>데이터 없음</div>";
+                labels.innerHTML = "";
+                return;
+            }
+
+            const maxVal = Math.max(...counts.map(c => c.count), 1);
+            chart.innerHTML = counts.map(c => {
+                const pct = (c.count / maxVal) * 100;
+                return '<div class="hourly-bar" style="height:' + pct + '%" data-tip="' + c.hour + '시: ' + c.count + '건"></div>';
+            }).join("");
+
+            labels.innerHTML = counts.filter((_, i) => i % 3 === 0).map(c =>
+                '<span>' + c.hour + '</span>'
+            ).join("");
+        }
+
+        // --- FAQ 품질 대시보드 ---
+        const CHECK_NAMES = {
+            duplicates: "중복 키워드",
+            keyword_coverage: "키워드 부족",
+            legal_refs: "법적 참조 오류",
+            answer_consistency: "답변 일관성",
+            category_balance: "카테고리 불균형"
+        };
+
+        async function loadFAQQuality() {
+            try {
+                const res = await authFetch(API_BASE + "/api/admin/faq-quality");
+                const data = await res.json();
+
+                const score = data.score !== undefined ? data.score : 0;
+                const scorePct = Math.round(score * 100);
+                document.getElementById("fqScoreValue").textContent = scorePct + "%";
+
+                const bar = document.getElementById("fqScoreBar");
+                bar.style.width = scorePct + "%";
+                if (scorePct >= 80) {
+                    bar.style.background = "#27ae60";
+                } else if (scorePct >= 50) {
+                    bar.style.background = "#e67e22";
+                } else {
+                    bar.style.background = "#e74c3c";
+                }
+
+                document.getElementById("fqPassedText").textContent =
+                    data.passed ? "모든 검사 통과" : (data.issues ? data.issues.length : 0) + "건의 이슈 발견";
+
+                const container = document.getElementById("fqIssueCards");
+                if (!data.issues || data.issues.length === 0) {
+                    container.innerHTML = '<div class="quality-card severity-good"><div class="qc-title">모든 검사 통과</div><div class="qc-detail">FAQ 데이터에 이슈가 없습니다.</div></div>';
+                    return;
+                }
+
+                container.innerHTML = data.issues.map(issue => {
+                    const severity = issue.severity || "warning";
+                    const name = CHECK_NAMES[issue.check] || issue.check;
+                    let detail = issue.count + "건 발견";
+
+                    if (issue.check === "duplicates" && issue.details && issue.details.length > 0) {
+                        detail += " - " + issue.details.slice(0, 3).map(d =>
+                            escapeHtml(d.faq1) + " / " + escapeHtml(d.faq2) + " (" + Math.round(d.overlap * 100) + "%)"
+                        ).join(", ");
+                    } else if (issue.check === "keyword_coverage" && issue.details && issue.details.length > 0) {
+                        detail += " - " + issue.details.slice(0, 3).map(d =>
+                            escapeHtml(d.faq_id) + " (" + d.keyword_count + "개)"
+                        ).join(", ");
+                    } else if (issue.check === "answer_consistency" && issue.details && issue.details.length > 0) {
+                        detail += " - " + issue.details.slice(0, 3).map(d =>
+                            escapeHtml(d.faq_id) + " (" + escapeHtml(d.issue) + ")"
+                        ).join(", ");
+                    }
+
+                    return '<div class="quality-card severity-' + severity + '">' +
+                        '<div class="qc-title">' + escapeHtml(name) + '</div>' +
+                        '<div class="qc-detail">' + detail + '</div></div>';
+                }).join("");
+            } catch (e) {
+                console.error("FAQ 품질 로딩 실패:", e);
+            }
+        }
+
+        // --- 만족도 트렌드 ---
+        const RESPONSE_TYPE_COLORS = {
+            faq_match: "#27ae60",
+            tfidf_match: "#3498db",
+            escalation: "#e67e22",
+            unknown: "#e74c3c"
+        };
+        const RESPONSE_TYPE_LABELS = {
+            faq_match: "FAQ 매칭",
+            tfidf_match: "TF-IDF 매칭",
+            escalation: "에스컬레이션",
+            unknown: "미응답"
+        };
+
+        async function loadSatisfaction() {
+            try {
+                const res = await authFetch(API_BASE + "/api/admin/satisfaction");
+                const data = await res.json();
+
+                // Overall score
+                const score = data.overall_score !== undefined ? data.overall_score : 0;
+                document.getElementById("satScore").textContent = (score * 100).toFixed(1) + "%";
+
+                // Trend arrow
+                const trendEl = document.getElementById("satTrend");
+                if (data.trend === "up") {
+                    trendEl.textContent = "▲";
+                    trendEl.className = "trend-indicator trend-up";
+                } else if (data.trend === "down") {
+                    trendEl.textContent = "▼";
+                    trendEl.className = "trend-indicator trend-down";
+                } else {
+                    trendEl.textContent = "▶";
+                    trendEl.className = "trend-indicator trend-stable";
+                }
+
+                document.getElementById("satTotal").textContent = data.total_queries || 0;
+                const reAskRate = data.re_ask_rate !== undefined ? data.re_ask_rate.toFixed(1) + "%" : "-";
+                document.getElementById("satReAskRate").textContent = reAskRate;
+
+                // Response type distribution bars
+                const dist = data.response_type_distribution || {};
+                const rtContainer = document.getElementById("satResponseTypes");
+                const entries = Object.entries(dist);
+                if (entries.length === 0) {
+                    rtContainer.innerHTML = '<div class="loading">데이터 없음</div>';
+                } else {
+                    const maxCount = Math.max(...entries.map(e => e[1]), 1);
+                    rtContainer.innerHTML = entries.map(([type, count]) => {
+                        const pct = (count / maxCount) * 100;
+                        const label = RESPONSE_TYPE_LABELS[type] || type;
+                        const color = RESPONSE_TYPE_COLORS[type] || "#999";
+                        return '<div class="rt-bar-row">' +
+                            '<div class="rt-bar-label">' + escapeHtml(label) + '</div>' +
+                            '<div class="rt-bar-track"><div class="rt-bar-fill" style="width:' + pct + '%; background:' + color + ';"></div></div>' +
+                            '<div class="rt-bar-count">' + count + '</div></div>';
+                    }).join("");
+                }
+
+                // Lowest rated table
+                const tbody = document.getElementById("satLowestBody");
+                const lowest = data.lowest_rated || [];
+                if (lowest.length === 0) {
+                    tbody.innerHTML = '<tr><td colspan="4" class="loading">낮은 만족도 응답 없음</td></tr>';
+                } else {
+                    tbody.innerHTML = lowest.map(q => {
+                        const typeLabel = RESPONSE_TYPE_LABELS[q.response_type] || q.response_type;
+                        const scoreVal = q.satisfaction_score !== undefined ? (q.satisfaction_score * 100).toFixed(0) + "%" : "-";
+                        return '<tr>' +
+                            '<td class="query-text" title="' + escapeHtml(q.query) + '">' + escapeHtml(q.query) + '</td>' +
+                            '<td>' + escapeHtml(typeLabel) + '</td>' +
+                            '<td>' + scoreVal + '</td>' +
+                            '<td>' + (q.re_asked ? '<span class="badge badge-esc">예</span>' : '-') + '</td></tr>';
+                    }).join("");
+                }
+            } catch (e) {
+                console.error("만족도 트렌드 로딩 실패:", e);
+            }
+        }
+
         // 초기 로딩
         loadStats();
         loadLogs();
         loadUnmatched();
         loadFeedback();
+        loadRealtime();
+        loadFAQQuality();
+        loadSatisfaction();
         loadAnalytics();
         loadWeeklyReport();
         loadFAQPipeline();
 
+        // 실시간 모니터링: 5초마다 갱신
+        setInterval(loadRealtime, 5000);
+
         // 30초마다 자동 갱신
-        setInterval(() => { loadStats(); loadLogs(); loadUnmatched(); loadFeedback(); loadAnalytics(); loadFAQPipeline(); }, 30000);
+        setInterval(() => { loadStats(); loadLogs(); loadUnmatched(); loadFeedback(); loadAnalytics(); loadFAQPipeline(); loadFAQQuality(); loadSatisfaction(); }, 30000);
     </script>
 </body>
 </html>

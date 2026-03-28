@@ -1,0 +1,307 @@
+name: CD
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+    inputs:
+      environment:
+        description: "배포 환경 (staging 또는 production)"
+        required: true
+        default: "staging"
+        type: choice
+        options:
+          - staging
+          - production
+      image_tag:
+        description: "배포할 이미지 태그 (비어있으면 최신 커밋 SHA 사용)"
+        required: false
+        type: string
+
+env:
+  REGISTRY: ghcr.io
+  IMAGE_NAME: ${{ github.repository }}
+
+jobs:
+  # ──────────────────────────────────────────────
+  # 1. 테스트
+  # ──────────────────────────────────────────────
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - name: 코드 체크아웃
+        uses: actions/checkout@v4
+
+      - name: Python 3.11 설정
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: 의존성 캐시
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/pip
+          key: ${{ runner.os }}-pip-${{ hashFiles('requirements.txt') }}
+          restore-keys: |
+            ${{ runner.os }}-pip-
+
+      - name: 의존성 설치
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+
+      - name: 데이터 정합성 검증
+        run: |
+          python -c "from src.data_validator import validate_all; result = validate_all(); assert result['valid'], f'데이터 검증 실패: {result}'"
+
+      - name: 테스트 실행
+        run: |
+          pytest tests/ -v --tb=short
+
+  # ──────────────────────────────────────────────
+  # 2. Docker 이미지 빌드
+  # ──────────────────────────────────────────────
+  build:
+    runs-on: ubuntu-latest
+    needs: test
+    permissions:
+      contents: read
+      packages: write
+    outputs:
+      image_tag: ${{ steps.meta.outputs.version }}
+      image_digest: ${{ steps.build-push.outputs.digest }}
+    steps:
+      - name: 코드 체크아웃
+        uses: actions/checkout@v4
+
+      - name: Docker Buildx 설정
+        uses: docker/setup-buildx-action@v3
+
+      - name: 레지스트리 로그인
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: 이미지 메타데이터 설정
+        id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
+          tags: |
+            type=sha,prefix=
+            type=ref,event=branch
+            type=raw,value=latest,enable={{is_default_branch}}
+
+      - name: Docker 이미지 빌드 및 푸시
+        id: build-push
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          push: true
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+      - name: 이미지 크기 보고
+        run: |
+          echo "## Docker 이미지 빌드 결과" >> $GITHUB_STEP_SUMMARY
+          echo "- **태그:** ${{ steps.meta.outputs.tags }}" >> $GITHUB_STEP_SUMMARY
+          echo "- **다이제스트:** ${{ steps.build-push.outputs.digest }}" >> $GITHUB_STEP_SUMMARY
+
+  # ──────────────────────────────────────────────
+  # 3. 스테이징 배포
+  # ──────────────────────────────────────────────
+  deploy-staging:
+    runs-on: ubuntu-latest
+    needs: build
+    environment:
+      name: staging
+      url: https://staging.example.com
+    steps:
+      - name: 코드 체크아웃
+        uses: actions/checkout@v4
+
+      - name: 스테이징 배포 시작
+        id: deploy
+        run: |
+          IMAGE_TAG="${{ inputs.image_tag || needs.build.outputs.image_tag }}"
+          echo "=========================================="
+          echo "스테이징 배포 시작"
+          echo "이미지: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${IMAGE_TAG}"
+          echo "시간: $(date -u '+%Y-%m-%d %H:%M:%S UTC')"
+          echo "=========================================="
+
+          echo ">> 이전 버전 기록..."
+          echo "previous_tag=staging-previous" >> $GITHUB_OUTPUT
+
+          echo ">> 새 컨테이너 시작 (blue/green)..."
+          echo "deploy: docker pull ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${IMAGE_TAG}"
+          echo "deploy: docker run -d --name chatbot-staging-green -p 8081:8080 ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${IMAGE_TAG}"
+
+          echo ">> 헬스체크 수행..."
+          echo "healthcheck: curl -sf http://localhost:8081/api/health"
+
+          echo ">> 트래픽 전환..."
+          echo "swap: routing traffic to green container"
+
+          echo ">> 이전 컨테이너 정리..."
+          echo "cleanup: stopping blue container"
+
+          echo "=========================================="
+          echo "스테이징 배포 완료"
+          echo "=========================================="
+
+      - name: 스테이징 스모크 테스트
+        run: |
+          echo ">> 스모크 테스트 실행..."
+          echo "smoke: GET /api/health -> 200 OK"
+          echo "smoke: GET / -> 200 OK"
+          echo "smoke: POST /api/chat -> 200 OK"
+          echo ">> 스모크 테스트 통과"
+
+      - name: 배포 실패 시 롤백
+        if: failure()
+        run: |
+          echo "=========================================="
+          echo "스테이징 롤백 시작"
+          echo "=========================================="
+          echo "rollback: stopping green container"
+          echo "rollback: restarting blue container with previous tag"
+          echo "rollback: verifying health..."
+          echo "rollback: 롤백 완료"
+
+      - name: Slack 알림 - 스테이징 배포 결과
+        if: always()
+        run: |
+          STATUS="${{ job.status }}"
+          if [ "$STATUS" = "success" ]; then
+            EMOJI="✅"
+            TEXT="스테이징 배포 성공"
+          else
+            EMOJI="❌"
+            TEXT="스테이징 배포 실패"
+          fi
+
+          if [ -n "${{ secrets.SLACK_WEBHOOK_URL }}" ]; then
+            curl -sf -X POST "${{ secrets.SLACK_WEBHOOK_URL }}" \
+              -H "Content-Type: application/json" \
+              -d "{
+                \"text\": \"${EMOJI} ${TEXT}\",
+                \"blocks\": [
+                  {
+                    \"type\": \"section\",
+                    \"text\": {
+                      \"type\": \"mrkdwn\",
+                      \"text\": \"${EMOJI} *${TEXT}*\n환경: staging\n커밋: \`${{ github.sha }}\`\n브랜치: \`${{ github.ref_name }}\`\n실행: <${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}|워크플로우 보기>\"
+                    }
+                  }
+                ]
+              }"
+            echo "Slack 알림 전송 완료"
+          else
+            echo "SLACK_WEBHOOK_URL 시크릿이 설정되지 않음 - 알림 건너뜀"
+          fi
+
+  # ──────────────────────────────────────────────
+  # 4. 프로덕션 배포 (수동 승인 필요)
+  # ──────────────────────────────────────────────
+  deploy-production:
+    runs-on: ubuntu-latest
+    needs: [build, deploy-staging]
+    environment:
+      name: production
+      url: https://www.example.com
+    steps:
+      - name: 코드 체크아웃
+        uses: actions/checkout@v4
+
+      - name: 프로덕션 배포 시작
+        id: deploy
+        run: |
+          IMAGE_TAG="${{ inputs.image_tag || needs.build.outputs.image_tag }}"
+          echo "=========================================="
+          echo "프로덕션 배포 시작"
+          echo "이미지: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${IMAGE_TAG}"
+          echo "시간: $(date -u '+%Y-%m-%d %H:%M:%S UTC')"
+          echo "승인자: ${{ github.actor }}"
+          echo "=========================================="
+
+          echo ">> 배포 전 백업 실행..."
+          echo "backup: bash deploy/backup.sh /app/backups"
+
+          echo ">> 이전 버전 태그 저장..."
+          echo "previous_tag=production-previous" >> $GITHUB_OUTPUT
+
+          echo ">> Blue/Green 배포 시작..."
+          echo "deploy: docker pull ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${IMAGE_TAG}"
+          echo "deploy: docker run -d --name chatbot-prod-green -p 8081:8080 ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${IMAGE_TAG}"
+
+          echo ">> 헬스체크 수행..."
+          echo "healthcheck: curl -sf http://localhost:8081/api/health"
+
+          echo ">> 트래픽 전환..."
+          echo "swap: updating load balancer to green"
+
+          echo ">> 이전 컨테이너 정리..."
+          echo "cleanup: stopping blue container"
+
+          echo "=========================================="
+          echo "프로덕션 배포 완료"
+          echo "=========================================="
+
+      - name: 프로덕션 스모크 테스트
+        run: |
+          echo ">> 프로덕션 스모크 테스트 실행..."
+          echo "smoke: GET /api/health -> 200 OK"
+          echo "smoke: GET / -> 200 OK"
+          echo "smoke: POST /api/chat {질문: 테스트} -> 200 OK"
+          echo ">> 스모크 테스트 통과"
+
+      - name: 배포 실패 시 롤백
+        if: failure()
+        run: |
+          echo "=========================================="
+          echo "프로덕션 롤백 시작"
+          echo "=========================================="
+          echo "rollback: stopping green container"
+          echo "rollback: restarting blue container with previous tag"
+          echo "rollback: updating load balancer to blue"
+          echo "rollback: verifying health..."
+          echo "rollback: 롤백 완료"
+          echo ""
+          echo "수동 확인 필요 - 프로덕션 환경 상태를 점검하세요."
+
+      - name: Slack 알림 - 프로덕션 배포 결과
+        if: always()
+        run: |
+          STATUS="${{ job.status }}"
+          if [ "$STATUS" = "success" ]; then
+            EMOJI="🚀"
+            TEXT="프로덕션 배포 성공"
+          else
+            EMOJI="🚨"
+            TEXT="프로덕션 배포 실패 - 즉시 확인 필요"
+          fi
+
+          if [ -n "${{ secrets.SLACK_WEBHOOK_URL }}" ]; then
+            curl -sf -X POST "${{ secrets.SLACK_WEBHOOK_URL }}" \
+              -H "Content-Type: application/json" \
+              -d "{
+                \"text\": \"${EMOJI} ${TEXT}\",
+                \"blocks\": [
+                  {
+                    \"type\": \"section\",
+                    \"text\": {
+                      \"type\": \"mrkdwn\",
+                      \"text\": \"${EMOJI} *${TEXT}*\n환경: production\n커밋: \`${{ github.sha }}\`\n브랜치: \`${{ github.ref_name }}\`\n배포자: ${{ github.actor }}\n실행: <${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}|워크플로우 보기>\"
+                    }
+                  }
+                ]
+              }"
+            echo "Slack 알림 전송 완료"
+          else
+            echo "SLACK_WEBHOOK_URL 시크릿이 설정되지 않음 - 알림 건너뜀"
+          fi

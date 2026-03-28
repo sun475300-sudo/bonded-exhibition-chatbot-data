@@ -3,12 +3,17 @@
 사용자 질문 → 분류 → FAQ 매칭 → 에스컬레이션 확인 → 답변 생성
 """
 
+from collections import OrderedDict
 from src.classifier import classify_query
+from src.clarification import ClarificationEngine
 from src.escalation import check_escalation, get_escalation_contact
+from src.related_faq import RelatedFAQFinder
 from src.response_builder import build_response, build_unknown_response
 from src.session import SessionManager
 from src.similarity import TFIDFMatcher
 from src.smart_classifier import SmartClassifier
+from src.spell_corrector import correct_query as spell_correct
+from src.synonym_resolver import expand_query
 from src.validator import get_needed_confirmations
 from src.utils import load_json, load_text, normalize_query
 
@@ -17,6 +22,7 @@ CATEGORY_BONUS = 2
 MIN_KEYWORD_HITS = 1
 KEYWORD_SCORE_THRESHOLD = 3
 TFIDF_SCORE_THRESHOLD = 0.1
+CLASSIFIER_CACHE_MAX_SIZE = 100
 
 
 class BondedExhibitionChatbot:
@@ -30,6 +36,21 @@ class BondedExhibitionChatbot:
         self.tfidf_matcher = TFIDFMatcher(self.faq_items)
         self.session_manager = SessionManager()
         self.smart_classifier = SmartClassifier()
+        self.clarification_engine = ClarificationEngine()
+        self.related_faq_finder = RelatedFAQFinder(self.faq_items)
+        self._classifier_cache: OrderedDict[str, list[str]] = OrderedDict()
+
+    def _cached_classify(self, query: str) -> list[str]:
+        """Classify a query with LRU caching (max 100 entries)."""
+        if query in self._classifier_cache:
+            # Move to end (most recently used)
+            self._classifier_cache.move_to_end(query)
+            return self._classifier_cache[query]
+        result = classify_query(query)
+        self._classifier_cache[query] = result
+        if len(self._classifier_cache) > CLASSIFIER_CACHE_MAX_SIZE:
+            self._classifier_cache.popitem(last=False)
+        return result
 
     def get_persona(self) -> str:
         """챗봇 페르소나 인사말을 반환한다."""
@@ -119,18 +140,30 @@ class BondedExhibitionChatbot:
 
         return self._process_new_query(query, session)
 
+    def _preprocess_query(self, query: str) -> tuple[str, list[dict]]:
+        """질문 전처리: 오타 교정 + 동의어 확장.
+
+        Returns:
+            (처리된 질문, 교정 목록) 튜플.
+        """
+        corrected, corrections = spell_correct(query)
+        expanded = expand_query(corrected)
+        return expanded, corrections
+
     def _process_new_query(self, query: str, session=None) -> str:
         """새 질문을 처리한다. 세션이 있으면 대화 기록 및 확인 질문을 관리한다."""
+        processed_query, corrections = self._preprocess_query(query)
+
         if session:
-            categories = self.smart_classifier.classify_with_context(query, session)
+            categories = self.smart_classifier.classify_with_context(processed_query, session)
         else:
-            categories = classify_query(query)
+            categories = self._cached_classify(processed_query)
         if not categories:
             categories = ["GENERAL"]
         primary_category = categories[0]
 
-        escalation = check_escalation(query)
-        faq_match = self.find_matching_faq(query, primary_category)
+        escalation = check_escalation(processed_query)
+        faq_match = self.find_matching_faq(processed_query, primary_category)
 
         # 에스컬레이션 우선: FAQ 매칭이 없거나 에스컬레이션만 트리거된 경우
         if escalation and not faq_match:

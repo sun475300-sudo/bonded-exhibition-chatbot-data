@@ -1,0 +1,1291 @@
+openapi: 3.0.3
+info:
+  title: 보세전시장 민원응대 챗봇 API
+  description: |
+    보세전시장 민원응대 챗봇의 REST API 명세서입니다.
+    FAQ 검색, 대화 관리, 관리자 기능, 카카오톡 연동 등을 제공합니다.
+  version: 1.0.0
+  contact:
+    name: 보세전시장 챗봇 관리팀
+
+servers:
+  - url: http://localhost:5000
+    description: 로컬 개발 서버
+
+tags:
+  - name: 챗봇
+    description: 챗봇 대화 및 질문 처리
+  - name: 세션
+    description: 대화 세션 관리
+  - name: FAQ
+    description: FAQ 목록 및 검색
+  - name: 인증
+    description: 사용자 인증 (JWT)
+  - name: 카카오톡
+    description: 카카오 i 오픈빌더 연동
+  - name: 관리자
+    description: 관리자 대시보드 기능 (인증 필요)
+  - name: 모니터링
+    description: 시스템 모니터링 및 메트릭
+
+security: []
+
+components:
+  securitySchemes:
+    BearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+      description: JWT 토큰 인증. /api/auth/login에서 발급받은 토큰을 사용합니다.
+
+  schemas:
+    Error:
+      type: object
+      properties:
+        error:
+          type: string
+          description: 오류 메시지
+      required:
+        - error
+
+    ChatRequest:
+      type: object
+      required:
+        - query
+      properties:
+        query:
+          type: string
+          description: 사용자 질문 (최대 2000자)
+          example: 보세전시장이 무엇인가요?
+        session_id:
+          type: string
+          description: 세션 ID (선택)
+        lang:
+          type: string
+          description: 응답 언어 코드
+          default: ko
+          example: ko
+
+    ChatResponse:
+      type: object
+      properties:
+        answer:
+          type: string
+          description: 챗봇 응답
+        category:
+          type: string
+          description: 주요 분류 카테고리
+        categories:
+          type: array
+          items:
+            type: string
+          description: 분류된 카테고리 목록
+        is_escalation:
+          type: boolean
+          description: 에스컬레이션 필요 여부
+        escalation_target:
+          type: string
+          nullable: true
+          description: 에스컬레이션 대상
+        lang:
+          type: string
+          description: 응답 언어
+        related_questions:
+          type: array
+          items:
+            type: object
+            properties:
+              id:
+                type: string
+              question:
+                type: string
+          description: 관련 질문 목록
+        session_id:
+          type: string
+          description: 세션 ID (요청 시 포함된 경우)
+
+    SessionInfo:
+      type: object
+      properties:
+        session_id:
+          type: string
+        created_at:
+          type: string
+
+    FAQItem:
+      type: object
+      properties:
+        id:
+          type: string
+          description: FAQ 항목 ID
+        category:
+          type: string
+          description: 카테고리
+        question:
+          type: string
+          description: 질문
+
+    FAQListResponse:
+      type: object
+      properties:
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/FAQItem'
+        count:
+          type: integer
+
+    ConfigResponse:
+      type: object
+      properties:
+        persona:
+          type: string
+          description: 챗봇 페르소나 텍스트
+        categories:
+          type: array
+          items:
+            type: object
+          description: FAQ 카테고리 목록
+        contacts:
+          type: object
+          description: 연락처 정보
+
+    HealthResponse:
+      type: object
+      properties:
+        status:
+          type: string
+          example: ok
+        faq_count:
+          type: integer
+
+    AutocompleteResponse:
+      type: object
+      properties:
+        suggestions:
+          type: array
+          items:
+            $ref: '#/components/schemas/FAQItem'
+
+    LoginRequest:
+      type: object
+      required:
+        - username
+        - password
+      properties:
+        username:
+          type: string
+          description: 사용자명
+        password:
+          type: string
+          description: 비밀번호
+
+    LoginResponse:
+      type: object
+      properties:
+        token:
+          type: string
+          description: JWT 액세스 토큰
+        expires_in:
+          type: integer
+          description: 토큰 만료 시간 (초)
+          example: 86400
+
+    UserInfo:
+      type: object
+      properties:
+        username:
+          type: string
+        role:
+          type: string
+
+    FeedbackRequest:
+      type: object
+      required:
+        - query_id
+        - rating
+      properties:
+        query_id:
+          type: string
+          description: 질문 ID
+        rating:
+          type: string
+          enum: [helpful, unhelpful]
+          description: 평가 (helpful 또는 unhelpful)
+        comment:
+          type: string
+          description: 코멘트 (선택)
+
+    FeedbackResponse:
+      type: object
+      properties:
+        success:
+          type: boolean
+        feedback_id:
+          type: string
+
+    ExportRequest:
+      type: object
+      required:
+        - session_id
+      properties:
+        session_id:
+          type: string
+          description: 세션 ID
+        format:
+          type: string
+          enum: [text, json, csv, html]
+          default: text
+          description: 내보내기 형식
+
+    KakaoSkillRequest:
+      type: object
+      properties:
+        userRequest:
+          type: object
+          properties:
+            utterance:
+              type: string
+              description: 사용자 발화
+            user:
+              type: object
+              properties:
+                id:
+                  type: string
+        bot:
+          type: object
+          properties:
+            id:
+              type: string
+        action:
+          type: object
+          properties:
+            name:
+              type: string
+            params:
+              type: object
+
+    KakaoSkillResponse:
+      type: object
+      properties:
+        version:
+          type: string
+        template:
+          type: object
+          properties:
+            outputs:
+              type: array
+              items:
+                type: object
+            quickReplies:
+              type: array
+              items:
+                type: object
+
+    AdminStatsResponse:
+      type: object
+      description: 통계 데이터 (chat_logger.get_stats() 결과)
+
+    AdminLogsResponse:
+      type: object
+      properties:
+        logs:
+          type: array
+          items:
+            type: object
+
+    CandidateIdRequest:
+      type: object
+      required:
+        - candidate_id
+      properties:
+        candidate_id:
+          type: string
+          description: FAQ 후보 ID
+
+    RelatedFAQResponse:
+      type: object
+      properties:
+        related:
+          type: array
+          items:
+            type: object
+        count:
+          type: integer
+
+    NotificationAckRequest:
+      type: object
+      required:
+        - notification_id
+      properties:
+        notification_id:
+          type: string
+          description: 알림 ID
+
+paths:
+  /api/chat:
+    post:
+      tags: [챗봇]
+      summary: 챗봇 질문 처리
+      description: 사용자 질문을 처리하여 답변을 반환합니다. Rate limiting이 적용됩니다.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ChatRequest'
+      responses:
+        '200':
+          description: 성공
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ChatResponse'
+        '400':
+          description: 잘못된 요청
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '429':
+          description: 요청 제한 초과
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /api/faq:
+    get:
+      tags: [FAQ]
+      summary: FAQ 목록 조회
+      description: 전체 FAQ 목록을 반환합니다.
+      responses:
+        '200':
+          description: 성공
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/FAQListResponse'
+
+  /api/autocomplete:
+    get:
+      tags: [FAQ]
+      summary: 검색 자동완성
+      description: FAQ 질문 중 쿼리 문자열을 포함하는 상위 5개를 반환합니다.
+      parameters:
+        - name: q
+          in: query
+          required: true
+          schema:
+            type: string
+          description: 검색 쿼리 문자열
+      responses:
+        '200':
+          description: 성공
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AutocompleteResponse'
+
+  /api/related/{faq_id}:
+    get:
+      tags: [FAQ]
+      summary: 관련 FAQ 조회
+      description: 지정한 FAQ 항목과 관련된 FAQ를 반환합니다.
+      parameters:
+        - name: faq_id
+          in: path
+          required: true
+          schema:
+            type: string
+          description: FAQ 항목 ID
+        - name: top_k
+          in: query
+          schema:
+            type: integer
+            default: 3
+          description: 반환할 관련 FAQ 수
+      responses:
+        '200':
+          description: 성공
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RelatedFAQResponse'
+        '500':
+          description: 서버 오류
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /api/feedback:
+    post:
+      tags: [챗봇]
+      summary: 사용자 피드백 저장
+      description: 사용자의 답변 평가 피드백을 저장합니다.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/FeedbackRequest'
+      responses:
+        '201':
+          description: 피드백 저장 성공
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/FeedbackResponse'
+        '400':
+          description: 잘못된 요청
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '500':
+          description: 서버 오류
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /api/export:
+    post:
+      tags: [세션]
+      summary: 대화 내역 내보내기
+      description: 세션의 대화 내역을 지정한 형식으로 내보냅니다.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ExportRequest'
+      responses:
+        '200':
+          description: 내보내기 파일
+          content:
+            text/plain:
+              schema:
+                type: string
+            application/json:
+              schema:
+                type: object
+            text/csv:
+              schema:
+                type: string
+            text/html:
+              schema:
+                type: string
+        '400':
+          description: 잘못된 요청
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '404':
+          description: 세션 없음
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /api/session/new:
+    post:
+      tags: [세션]
+      summary: 새 세션 생성
+      description: 새로운 대화 세션을 생성합니다.
+      responses:
+        '201':
+          description: 세션 생성 성공
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SessionInfo'
+
+  /api/session/{session_id}:
+    get:
+      tags: [세션]
+      summary: 세션 상태 조회
+      description: 세션의 상태 정보를 반환합니다.
+      parameters:
+        - name: session_id
+          in: path
+          required: true
+          schema:
+            type: string
+          description: 세션 ID
+      responses:
+        '200':
+          description: 성공
+          content:
+            application/json:
+              schema:
+                type: object
+        '404':
+          description: 세션 없음
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /api/session/{session_id}/export:
+    get:
+      tags: [세션]
+      summary: 세션 대화 내보내기
+      description: 세션 대화를 지정 형식으로 내보냅니다.
+      parameters:
+        - name: session_id
+          in: path
+          required: true
+          schema:
+            type: string
+          description: 세션 ID
+        - name: format
+          in: query
+          schema:
+            type: string
+            enum: [text, json, csv, html]
+            default: text
+          description: 내보내기 형식
+      responses:
+        '200':
+          description: 내보내기 파일
+        '404':
+          description: 세션 없음
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /api/config:
+    get:
+      tags: [챗봇]
+      summary: 챗봇 설정 조회
+      description: 챗봇의 설정 정보(페르소나, 카테고리, 연락처)를 반환합니다.
+      responses:
+        '200':
+          description: 성공
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ConfigResponse'
+
+  /api/health:
+    get:
+      tags: [모니터링]
+      summary: 헬스 체크
+      description: 서버 상태와 FAQ 개수를 반환합니다.
+      responses:
+        '200':
+          description: 성공
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HealthResponse'
+
+  /api/auth/login:
+    post:
+      tags: [인증]
+      summary: 로그인
+      description: 사용자명과 비밀번호로 로그인하여 JWT 토큰을 발급받습니다.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/LoginRequest'
+      responses:
+        '200':
+          description: 로그인 성공
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/LoginResponse'
+        '400':
+          description: 잘못된 요청
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '401':
+          description: 인증 실패
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /api/auth/me:
+    get:
+      tags: [인증]
+      summary: 현재 사용자 정보
+      description: 현재 인증된 사용자의 정보를 반환합니다.
+      security:
+        - BearerAuth: []
+      responses:
+        '200':
+          description: 성공
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UserInfo'
+        '401':
+          description: 인증 필요
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /api/kakao/chat:
+    post:
+      tags: [카카오톡]
+      summary: 카카오 챗봇 스킬 요청
+      description: 카카오 i 오픈빌더 스킬 요청을 처리하여 응답을 반환합니다.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/KakaoSkillRequest'
+      responses:
+        '200':
+          description: 카카오 스킬 응답
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/KakaoSkillResponse'
+
+  /api/kakao/faq:
+    post:
+      tags: [카카오톡]
+      summary: 카카오 FAQ 캐러셀
+      description: FAQ 목록을 카카오 캐러셀 카드 형식으로 반환합니다.
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/KakaoSkillRequest'
+      responses:
+        '200':
+          description: 카카오 캐러셀 응답
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/KakaoSkillResponse'
+
+  /api/admin/stats:
+    get:
+      tags: [관리자]
+      summary: 통계 조회
+      description: 챗봇 사용 통계를 반환합니다.
+      security:
+        - BearerAuth: []
+      responses:
+        '200':
+          description: 성공
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AdminStatsResponse'
+        '401':
+          description: 인증 필요
+
+  /api/admin/logs:
+    get:
+      tags: [관리자]
+      summary: 최근 로그 조회
+      description: 최근 대화 로그를 반환합니다.
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            default: 50
+          description: 조회할 로그 수
+      responses:
+        '200':
+          description: 성공
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AdminLogsResponse'
+        '401':
+          description: 인증 필요
+
+  /api/admin/unmatched:
+    get:
+      tags: [관리자]
+      summary: 미매칭 질문 조회
+      description: 매칭되지 않은 질문 목록을 반환합니다.
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            default: 20
+          description: 조회할 질문 수
+      responses:
+        '200':
+          description: 성공
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  queries:
+                    type: array
+                    items:
+                      type: object
+        '401':
+          description: 인증 필요
+
+  /api/admin/recommendations:
+    get:
+      tags: [관리자]
+      summary: FAQ 추천 목록
+      description: 미매칭 질문 기반 FAQ 추가 후보 추천 목록을 반환합니다.
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: top_k
+          in: query
+          schema:
+            type: integer
+            default: 10
+          description: 추천 항목 수
+      responses:
+        '200':
+          description: 성공
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  recommendations:
+                    type: array
+                    items:
+                      type: object
+                  count:
+                    type: integer
+        '401':
+          description: 인증 필요
+        '500':
+          description: 서버 오류
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /api/admin/feedback:
+    get:
+      tags: [관리자]
+      summary: 피드백 통계 조회
+      description: 피드백 통계와 낮은 평가 질문 목록을 반환합니다.
+      security:
+        - BearerAuth: []
+      responses:
+        '200':
+          description: 성공
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  stats:
+                    type: object
+                  low_rated_queries:
+                    type: array
+                    items:
+                      type: object
+        '401':
+          description: 인증 필요
+
+  /api/admin/analytics:
+    get:
+      tags: [관리자]
+      summary: 분석 리포트
+      description: 트렌드, 품질 점수, 피크 시간대 등 분석 리포트를 반환합니다.
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: days
+          in: query
+          schema:
+            type: integer
+            default: 7
+          description: 분석 기간 (일)
+      responses:
+        '200':
+          description: 성공
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  trend:
+                    type: object
+                  quality:
+                    type: object
+                  peak_hours:
+                    type: object
+        '401':
+          description: 인증 필요
+        '500':
+          description: 서버 오류
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /api/admin/report:
+    get:
+      tags: [관리자]
+      summary: 주간 리포트
+      description: 주간 리포트 텍스트를 반환합니다.
+      security:
+        - BearerAuth: []
+      responses:
+        '200':
+          description: 성공
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  report:
+                    type: string
+        '401':
+          description: 인증 필요
+        '500':
+          description: 서버 오류
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /api/admin/faq-pipeline:
+    get:
+      tags: [관리자]
+      summary: FAQ 파이프라인 후보 목록
+      description: FAQ 추가 후보 목록을 반환합니다.
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: min_frequency
+          in: query
+          schema:
+            type: integer
+            default: 3
+          description: 최소 빈도수
+      responses:
+        '200':
+          description: 성공
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  candidates:
+                    type: array
+                    items:
+                      type: object
+                  count:
+                    type: integer
+        '401':
+          description: 인증 필요
+        '500':
+          description: 서버 오류
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /api/admin/faq-pipeline/approve:
+    post:
+      tags: [관리자]
+      summary: FAQ 후보 승인
+      description: FAQ 후보를 승인하여 FAQ에 추가합니다.
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CandidateIdRequest'
+      responses:
+        '200':
+          description: 성공
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                  candidate:
+                    type: object
+        '400':
+          description: 잘못된 요청
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '401':
+          description: 인증 필요
+        '500':
+          description: 서버 오류
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /api/admin/faq-pipeline/reject:
+    post:
+      tags: [관리자]
+      summary: FAQ 후보 거부
+      description: FAQ 후보를 거부합니다.
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CandidateIdRequest'
+      responses:
+        '200':
+          description: 성공
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                  candidate:
+                    type: object
+        '400':
+          description: 잘못된 요청
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '401':
+          description: 인증 필요
+        '500':
+          description: 서버 오류
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /api/admin/monitor:
+    get:
+      tags: [관리자]
+      summary: 실시간 모니터링
+      description: 실시간 모니터링 데이터와 알림을 반환합니다.
+      security:
+        - BearerAuth: []
+      responses:
+        '200':
+          description: 성공
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  stats:
+                    type: object
+                  alerts:
+                    type: array
+                    items:
+                      type: object
+        '401':
+          description: 인증 필요
+        '500':
+          description: 서버 오류
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /api/admin/quality:
+    get:
+      tags: [관리자]
+      summary: FAQ 품질 검사
+      description: FAQ 품질 검사 결과를 반환합니다.
+      security:
+        - BearerAuth: []
+      responses:
+        '200':
+          description: 성공
+          content:
+            application/json:
+              schema:
+                type: object
+        '401':
+          description: 인증 필요
+        '500':
+          description: 서버 오류
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /api/admin/realtime:
+    get:
+      tags: [관리자]
+      summary: 실시간 라이브 통계
+      description: 실시간 모니터링 라이브 통계 (분당 쿼리 수, 응답 시간, 시간대별 통계 등)를 반환합니다.
+      security:
+        - BearerAuth: []
+      responses:
+        '200':
+          description: 성공
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  queries_per_minute:
+                    type: number
+                  avg_response_time_ms:
+                    type: number
+                  active_sessions:
+                    type: integer
+                  error_rate:
+                    type: number
+                  unmatched_rate:
+                    type: number
+                  queries_last_hour:
+                    type: integer
+                  top_categories:
+                    type: object
+                  alerts:
+                    type: array
+                    items:
+                      type: object
+                  hourly_counts:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        hour:
+                          type: string
+                        count:
+                          type: integer
+        '401':
+          description: 인증 필요
+        '500':
+          description: 서버 오류
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /api/admin/faq-quality:
+    get:
+      tags: [관리자]
+      summary: FAQ 품질 대시보드
+      description: FAQ 품질 대시보드 데이터 (이슈별 심각도 포함)를 반환합니다.
+      security:
+        - BearerAuth: []
+      responses:
+        '200':
+          description: 성공
+          content:
+            application/json:
+              schema:
+                type: object
+        '401':
+          description: 인증 필요
+        '500':
+          description: 서버 오류
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /api/admin/satisfaction:
+    get:
+      tags: [관리자]
+      summary: 만족도 트렌드
+      description: 만족도 트렌드 데이터를 반환합니다.
+      security:
+        - BearerAuth: []
+      responses:
+        '200':
+          description: 성공
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  overall_score:
+                    type: number
+                  trend:
+                    type: string
+                    enum: [up, stable, down]
+                  total_queries:
+                    type: integer
+                  re_ask_rate:
+                    type: number
+                  response_type_distribution:
+                    type: object
+                  lowest_rated:
+                    type: array
+                    items:
+                      type: object
+        '401':
+          description: 인증 필요
+        '500':
+          description: 서버 오류
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /api/admin/cache/clear:
+    post:
+      tags: [관리자]
+      summary: FAQ 캐시 초기화
+      description: FAQ 캐시를 무효화하고 다시 로드합니다.
+      security:
+        - BearerAuth: []
+      responses:
+        '200':
+          description: 성공
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                  faq_count:
+                    type: integer
+        '401':
+          description: 인증 필요
+        '500':
+          description: 서버 오류
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /api/admin/law-updates:
+    get:
+      tags: [관리자]
+      summary: 법령 업데이트 조회
+      description: 최근 법령 변경과 영향 받는 FAQ를 반환합니다.
+      parameters:
+        - name: since
+          in: query
+          schema:
+            type: string
+            default: "1970-01-01"
+          description: 조회 시작 날짜 (YYYY-MM-DD)
+      responses:
+        '200':
+          description: 성공
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  changes:
+                    type: array
+                    items:
+                      type: object
+                  pending_notifications:
+                    type: array
+                    items:
+                      type: object
+                  update_history:
+                    type: array
+                    items:
+                      type: object
+        '500':
+          description: 서버 오류
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /api/admin/law-updates/check:
+    post:
+      tags: [관리자]
+      summary: 법령 업데이트 확인
+      description: 수동으로 법령 업데이트를 확인합니다.
+      responses:
+        '200':
+          description: 성공
+          content:
+            application/json:
+              schema:
+                type: object
+        '500':
+          description: 서버 오류
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /api/admin/law-updates/acknowledge:
+    post:
+      tags: [관리자]
+      summary: 법령 변경 알림 확인
+      description: 법령 변경 알림을 확인 처리합니다.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/NotificationAckRequest'
+      responses:
+        '200':
+          description: 성공
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+        '400':
+          description: 잘못된 요청
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '404':
+          description: 알림 없음
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '500':
+          description: 서버 오류
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /metrics:
+    get:
+      tags: [모니터링]
+      summary: Prometheus 메트릭
+      description: Prometheus 형식의 메트릭 데이터를 반환합니다.
+      responses:
+        '200':
+          description: 성공
+          content:
+            text/plain:
+              schema:
+                type: string
+                description: Prometheus 텍스트 형식 메트릭

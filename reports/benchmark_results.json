@@ -1,0 +1,39 @@
+{
+  "timestamp": "2026-03-28T05:11:55",
+  "results": [
+    {
+      "name": "Classifier",
+      "iterations": 50,
+      "elapsed_sec": 0.0004,
+      "ops_per_sec": 129278.14
+    },
+    {
+      "name": "TF-IDF Matching",
+      "iterations": 50,
+      "elapsed_sec": 0.0014,
+      "ops_per_sec": 34559.84
+    },
+    {
+      "name": "BM25 Ranking",
+      "iterations": 50,
+      "elapsed_sec": 0.001,
+      "ops_per_sec": 48245.32
+    },
+    {
+      "name": "Session Create+Lookup",
+      "iterations": 50,
+      "elapsed_sec": 0.0008,
+      "ops_per_sec": 121206.1,
+      "detail": {
+        "create_ops_per_sec": 61997.59,
+        "lookup_ops_per_sec": 2694255.85
+      }
+    },
+    {
+      "name": "Spell Correction",
+      "iterations": 50,
+      "elapsed_sec": 0.0239,
+      "ops_per_sec": 2089.55
+    }
+  ]
+}
