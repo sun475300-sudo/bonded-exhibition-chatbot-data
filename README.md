@@ -11,10 +11,10 @@
 | FAQ | 50개 (v3.0.0) |
 | 질문 카테고리 | 10개 |
 | 에스컬레이션 규칙 | 5개 |
-| 테스트 | 422개 (전체 PASS) |
-| 소스 파일 | 22개 |
-| 테스트 파일 | 21개 |
-| 커밋 | 20개 |
+| 테스트 | 469개 (전체 PASS) |
+| 소스 파일 | 33개 |
+| 테스트 파일 | 22개 |
+| 커밋 | 22개 |
 
 ---
 
@@ -181,7 +181,7 @@ docker-compose up -d
 
 ### 테스트
 ```bash
-python -m pytest tests/ -v       # 422개 테스트
+python -m pytest tests/ -v       # 469개 테스트
 ```
 
 ---
@@ -220,8 +220,19 @@ bonded-exhibition-chatbot-data/
 │   ├── kakao_adapter.py           # 카카오톡 어댑터
 │   ├── llm_fallback.py            # LLM 하이브리드 폴백
 │   ├── law_updater.py             # 법령 업데이트 감지
+│   ├── synonym_resolver.py        # 동의어 사전 (30개 매핑)
+│   ├── spell_corrector.py         # 오타 교정 (레벤슈타인 거리)
+│   ├── clarification.py           # 모호 질문 되묻기 엔진
+│   ├── satisfaction_tracker.py    # 답변 만족도 자동 추적
+│   ├── korean_tokenizer.py        # 한국어 형태소 토크나이저
+│   ├── bm25_ranker.py             # BM25 랭킹 엔진
+│   ├── related_faq.py             # 관련 질문 추천
+│   ├── realtime_monitor.py        # 실시간 모니터링
+│   ├── faq_quality_checker.py     # FAQ 품질 자동 검사
+│   ├── conversation_export.py     # 대화 내보내기 (Text/JSON/CSV/HTML)
+│   ├── plugin_system.py           # 플러그인 시스템 (6개 훅)
 │   └── utils.py                   # 유틸리티
-├── tests/                         # 422개 테스트
+├── tests/                         # 469개 테스트
 │   ├── test_chatbot.py            # 통합 테스트
 │   ├── test_classifier.py         # 분류기
 │   ├── test_similarity.py         # TF-IDF 매칭
@@ -339,6 +350,8 @@ timeline
         보안 + 프로덕션 : API Key, Rate Limit, 분석, nginx, gunicorn
     section Phase 10-12
         품질 완성 : E2E 테스트, 회귀 16건, 부하, 문서화, UX
+    section Phase 13-18
+        고도화 : 오타교정, BM25, 실시간모니터링, 품질검사, 플러그인
 ```
 
 ## 업데이트 내역
@@ -349,6 +362,7 @@ timeline
 | v1.x | 버그 22건 수정 (분류기, FAQ 매칭, 정규화 등) |
 | v2.0.0 | Phase 1-6 (멀티턴, TF-IDF, Docker, SmartClassifier, PWA, 다국어) |
 | v3.0.0 | Phase 7-12 (보안, 분석, 프로덕션, E2E 테스트, 문서화, UX) |
+| v4.0.0 | Phase 13-18 (오타교정, BM25, 실시간모니터링, 품질검사, 플러그인) |
 
 ## 라이선스
 
