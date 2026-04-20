@@ -105,6 +105,10 @@ def expand_query(query: str) -> str:
     that exact-match scoring still works, and the canonical terms are
     appended so that FAQ/keyword lookups can also match.
 
+    Only matches synonyms that appear as whole tokens (space-separated
+    words) to avoid false positives from substring matches (e.g. "사" in
+    "물품검사" should not trigger the "사→구매" mapping).
+
     Args:
         query: The raw user query string.
 
@@ -113,9 +117,10 @@ def expand_query(query: str) -> str:
         (space-separated).  If no synonyms are found the original query
         is returned unchanged.
     """
+    query_tokens: set[str] = set(query.lower().split())
     canonical_terms: list[str] = []
     for synonym in _SORTED_KEYS:
-        if synonym in query:
+        if synonym.lower() in query_tokens:
             canonical = SYNONYMS[synonym]
             if canonical not in canonical_terms:
                 canonical_terms.append(canonical)

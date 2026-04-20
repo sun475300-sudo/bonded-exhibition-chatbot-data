@@ -369,7 +369,12 @@ class FAQUpdateNotifier:
 # ---------------------------------------------------------------------------
 
 class LawUpdateScheduler:
-    """법령 업데이트를 주기적으로 확인하는 스케줄러."""
+    """법령 업데이트를 주기적으로 확인하는 스케줄러.
+
+    schedule_check()를 호출하면 지정한 주기(기본 24시간)마다
+    국가법령정보센터 API를 호출하여 법령 변경 여부를 확인하고,
+    변경이 있으면 legal_references·RAG·FAQ 데이터를 자동으로 최신화한다.
+    """
 
     def __init__(
         self,
@@ -382,6 +387,8 @@ class LawUpdateScheduler:
         self._running = False
         self._interval_hours: float = 24
         self._update_history: list[dict] = []
+        # LawFAQUpdater는 순환 import 방지를 위해 지연 초기화
+        self._law_faq_updater = None
 
     def schedule_check(self, interval_hours: float = 24):
         """주기적 업데이트 확인을 설정한다.
@@ -403,9 +410,28 @@ class LawUpdateScheduler:
         self._timer.start()
 
     def _run_check(self):
-        """예약된 확인을 실행한다."""
+        """예약된 확인을 실행한다.
+
+        국가법령정보센터 API를 통해 법령 변경을 확인하고,
+        변경이 있으면 전체 데이터 업데이트 파이프라인을 실행한다.
+        API 호출 실패 시 로컬 파일 기반 확인으로 폴백한다.
+        """
         try:
-            self.check_for_updates()
+            # 국가법령정보센터 API 기반 전체 업데이트 시도
+            if self._law_faq_updater is None:
+                from src.law_api_sync import LawFAQUpdater
+                self._law_faq_updater = LawFAQUpdater()
+            api_result = self._law_faq_updater.run_full_update()
+            self._update_history.append({
+                "type": "api_update",
+                "result": api_result,
+            })
+        except Exception:
+            # API 실패 시 로컬 파일 변경 감지로 폴백
+            try:
+                self.check_for_updates()
+            except Exception:
+                pass
         finally:
             self._schedule_next()
 

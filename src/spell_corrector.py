@@ -220,6 +220,40 @@ def correct_term(term: str, max_distance: int = 2) -> str | None:
 
 
 # ---------------------------------------------------------------------------
+# 한국어 문법 어미·조사: 해당 어미로 끝나는 토큰은 교정 대상에서 제외
+# ---------------------------------------------------------------------------
+_GRAMMATICAL_ENDINGS: tuple[str, ...] = (
+    # 문법 어미 (verb endings)
+    "에서", "에게", "에서는", "에서도", "에게서",
+    "없이", "있는", "없는", "없나요", "있나요",
+    "할", "하면", "해야", "하여", "하고", "하는",
+    "하려면", "하려고", "하면서", "했습니다", "합니다", "해요",
+    "하나요", "되나요", "인가요", "이나요", "이에요", "이어요",
+    "나요", "에요", "어요", "아요", "이라면",
+    "이고", "이며", "이나", "이라도", "이라", "이거나",
+    "으로", "으로서", "으로부터",
+    # 조사 (postpositions) - 단일 음절은 너무 짧아 오탐 가능성이 높으므로 제외
+    "부터", "까지", "마다", "조차", "마저",
+    # 기타 어미
+    "했나요", "이었나요", "였나요", "이었어요", "였어요",
+    # 단일 음절 조사 (3자 이상 토큰에만 적용됨)
+    "은", "는", "이", "가", "을", "를", "에", "로", "의", "도",
+)
+
+
+def _has_grammatical_ending(token: str) -> bool:
+    """토큰이 한국어 문법 어미·조사로 끝나는지 확인한다."""
+    for ending in _GRAMMATICAL_ENDINGS:
+        # 어미보다 긴 토큰에만 적용 (어미 자체와 동일한 경우 제외)
+        if token.endswith(ending) and len(token) > len(ending):
+            # 단일 음절 조사는 3자 이상 토큰에만 적용 (2자 토큰 오탐 방지)
+            if len(ending) == 1 and len(token) < 3:
+                continue
+            return True
+    return False
+
+
+# ---------------------------------------------------------------------------
 # 쿼리 전체 교정
 # ---------------------------------------------------------------------------
 def correct_query(query: str) -> tuple[str, list[dict]]:
@@ -227,6 +261,9 @@ def correct_query(query: str) -> tuple[str, list[dict]]:
 
     공백 기준으로 토큰을 분리한 뒤 각 토큰을 ``correct_term`` 으로 검사한다.
     교정이 발생한 토큰 정보를 함께 반환한다.
+
+    문법 어미·조사로 끝나는 유효한 한국어 활용형(예: "전시할", "없이")은
+    교정 대상에서 제외하여 잘못된 도메인 용어 치환을 방지한다.
 
     Args:
         query: 사용자 원문 질의
@@ -250,13 +287,19 @@ def correct_query(query: str) -> tuple[str, list[dict]]:
             corrected_tokens.append(token)
             continue
 
+        # 문법 어미·조사로 끝나는 활용형은 교정하지 않음
+        if _has_grammatical_ending(token):
+            corrected_tokens.append(token)
+            continue
+
         suggestion = correct_term(token)
         if suggestion is not None and suggestion != token:
             dist = levenshtein_distance(token, suggestion)
-            # 공통 문자 비율이 50% 미만이면 무관한 단어로 판단하여 교정 생략
+            # 공통 문자 비율이 60% 미만이면 무관한 단어로 판단하여 교정 생략
+            # (기존 50% → 60%: 조사 붙은 형태가 잘못 교정되는 경우 방지)
             common_chars = sum(1 for a, b in zip(token, suggestion) if a == b)
             max_len = max(len(token), len(suggestion))
-            if max_len > 0 and common_chars / max_len < 0.5:
+            if max_len > 0 and common_chars / max_len < 0.6:
                 corrected_tokens.append(token)
                 continue
             corrections.append({
