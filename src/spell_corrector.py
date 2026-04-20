@@ -54,6 +54,23 @@ def _jamo_similarity(a: str, b: str) -> int:
     return score
 
 # ---------------------------------------------------------------------------
+# 한국어 조사/어미 (이 접미사로 끝나는 토큰은 줄기를 검사 후 교정 생략)
+# ---------------------------------------------------------------------------
+_PARTICLE_SUFFIXES: tuple[str, ...] = (
+    "에서", "으로", "하면", "에는", "로서",  # 2자 이상 먼저
+    "은", "는", "이", "가", "을", "를", "에", "도", "시", "의", "만", "와", "과",
+)
+
+
+def _strip_particle(token: str) -> str:
+    """토큰 끝의 조사/어미를 제거한 줄기를 반환한다. 해당 없으면 원형 반환."""
+    for suffix in _PARTICLE_SUFFIXES:
+        if token.endswith(suffix) and len(token) > len(suffix):
+            return token[: -len(suffix)]
+    return token
+
+
+# ---------------------------------------------------------------------------
 # 도메인 용어 사전 (10개 카테고리 전체를 포괄)
 # ---------------------------------------------------------------------------
 KNOWN_TERMS: set[str] = {
@@ -115,6 +132,10 @@ KNOWN_TERMS: set[str] = {
     "허가", "승인", "신고", "확인", "절차", "규정",
     "기간", "회기", "준비기간", "정리기간",
     "수입", "수출", "관세", "면세", "감면",
+
+    # ── 자주 오교정되는 정상 단어 ──
+    "없이", "대금", "수금", "결제", "정산", "수수료", "비용",
+    "범위", "교체", "바꾸다", "바꿀", "필요", "의무",
 }
 
 
@@ -250,13 +271,19 @@ def correct_query(query: str) -> tuple[str, list[dict]]:
             corrected_tokens.append(token)
             continue
 
+        # 조사를 제거한 줄기가 사전에 있으면 해당 토큰은 교정 불필요
+        stem = _strip_particle(token)
+        if stem != token and stem in KNOWN_TERMS:
+            corrected_tokens.append(token)
+            continue
+
         suggestion = correct_term(token)
         if suggestion is not None and suggestion != token:
             dist = levenshtein_distance(token, suggestion)
-            # 공통 문자 비율이 50% 미만이면 무관한 단어로 판단하여 교정 생략
+            # 공통 문자 비율이 70% 미만이면 무관한 단어로 판단하여 교정 생략
             common_chars = sum(1 for a, b in zip(token, suggestion) if a == b)
             max_len = max(len(token), len(suggestion))
-            if max_len > 0 and common_chars / max_len < 0.5:
+            if max_len > 0 and common_chars / max_len < 0.7:
                 corrected_tokens.append(token)
                 continue
             corrections.append({

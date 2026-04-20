@@ -31,9 +31,23 @@ LAW_API_BASE = "https://www.law.go.kr/DRF/lawService.do"
 LAW_SEARCH_BASE = "https://www.law.go.kr/DRF/lawSearch.do"
 
 MONITORED_LAWS = [
-    {"law_name": "관세법", "articles": ["제190조", "제161조", "제269조", "제183조", "제174조", "제226조"]},
-    {"law_name": "관세법 시행령", "articles": ["제101조", "제102조", "제208조"]},
+    {
+        "law_name": "관세법",
+        "articles": ["제190조", "제161조", "제269조", "제183조", "제174조", "제226조"],
+    },
+    {
+        "law_name": "관세법 시행령",
+        "articles": ["제101조", "제102조", "제208조"],
+    },
+    {
+        "law_name": "보세전시장 운영에 관한 고시",
+        "articles": ["관세청고시 제2026-15호"],
+        "target": "admrul",  # 행정규칙(고시) 검색용
+    },
 ]
+
+# 행정규칙(고시) 검색 전용 URL
+LAW_ADMRUL_BASE = "https://www.law.go.kr/DRF/lawService.do"
 
 
 class LawAPIClient:
@@ -77,29 +91,85 @@ class LawAPIClient:
         except URLError as e:
             return None
 
-    def get_article_text(self, xml_data, article_no):
+    def get_admrul_text(self, law_name: str) -> str | None:
+        """행정규칙(고시)의 전문을 가져온다."""
+        params = f"OC={self.oc}&target=admrul&type=XML&query={quote(law_name)}"
+        url = f"{LAW_SEARCH_BASE}?{params}"
+        try:
+            req = Request(url, headers={"User-Agent": "BondedExhibitionChatbot/1.0"})
+            with urlopen(req, timeout=30) as resp:
+                xml_data = resp.read().decode("utf-8")
+            # 검색 결과에서 첫 번째 고시의 ID를 찾아 본문 조회
+            root = ET.fromstring(xml_data)
+            admrul_id = None
+            for item in root.iter():
+                if item.tag in ("행정규칙일련번호", "admRulId", "lawId"):
+                    if item.text:
+                        admrul_id = item.text.strip()
+                        break
+            if admrul_id:
+                detail_params = f"OC={self.oc}&target=admrul&type=XML&ID={admrul_id}"
+                detail_url = f"{LAW_ADMRUL_BASE}?{detail_params}"
+                req2 = Request(detail_url, headers={"User-Agent": "BondedExhibitionChatbot/1.0"})
+                with urlopen(req2, timeout=30) as resp2:
+                    return resp2.read().decode("utf-8")
+            return xml_data
+        except (URLError, ET.ParseError):
+            return None
+
+    def get_article_text(self, xml_data: str, article_no: str) -> str | None:
         """XML에서 특정 조문 본문을 추출한다."""
         if not xml_data:
             return None
         try:
             root = ET.fromstring(xml_data)
+            # 정규화된 조문 번호 (숫자만 추출)
+            article_digits = article_no.replace("제", "").replace("조", "").strip()
+
+            # 1차 시도: 표준 조문 태그
             for article in root.iter():
-                if article.tag in ("조문", "Article", "조문내용"):
-                    no = self._get_text(article, "조문번호") or self._get_text(article, "조문제목") or ""
-                    if article_no.replace("제", "").replace("조", "") in no.replace("제", "").replace("조", ""):
+                if article.tag in ("조문", "Article", "조문내용", "조문단위"):
+                    no_raw = (
+                        self._get_text(article, "조문번호")
+                        or self._get_text(article, "조문제목")
+                        or ""
+                    )
+                    no_digits = no_raw.replace("제", "").replace("조", "").strip()
+                    if article_digits and no_digits and article_digits == no_digits:
                         content = self._get_text(article, "조문내용") or ""
                         if not content:
-                            content = "".join(article.itertext()).strip()
-                        return content
-            for elem in root.iter():
-                text = elem.text or ""
-                if article_no in text and len(text) > len(article_no) + 10:
-                    return text.strip()
+                            content = " ".join(article.itertext()).strip()
+                        if content:
+                            return content
+
+            # 2차 시도: 전체 텍스트에서 해당 조항이 포함된 단락 추출
+            full_text = " ".join(root.itertext())
+            sentences = [s.strip() for s in full_text.split("\n") if s.strip()]
+            for i, sentence in enumerate(sentences):
+                if article_no in sentence or article_digits in sentence:
+                    # 해당 줄부터 최대 5줄 반환
+                    chunk = " ".join(sentences[i: i + 5])
+                    if len(chunk) > len(article_no) + 10:
+                        return chunk
+
         except ET.ParseError:
             pass
         return None
 
-    def _get_text(self, elem, tag):
+    def get_full_text_summary(self, xml_data: str, max_chars: int = 500) -> str:
+        """XML 법령 전문에서 핵심 요약 텍스트를 추출한다."""
+        if not xml_data:
+            return ""
+        try:
+            root = ET.fromstring(xml_data)
+            all_text = " ".join(
+                t.strip() for t in root.itertext() if t.strip()
+            )
+            return all_text[:max_chars]
+        except ET.ParseError:
+            return ""
+
+    def _get_text(self, elem, tag: str) -> str | None:
         child = elem.find(tag)
         if child is not None and child.text:
             return child.text.strip()
@@ -144,7 +214,10 @@ class LawSyncManager:
             conn.close()
 
     def check_all(self):
-        """모니터링 대상 모든 법령 조문의 변경을 확인한다."""
+        """모니터링 대상 모든 법령 조문의 변경을 확인한다.
+
+        일반 법령(관세법 등)과 행정규칙(고시) 모두 처리한다.
+        """
         results = {
             "checked_at": datetime.now().isoformat(),
             "total_checked": 0,
@@ -155,14 +228,25 @@ class LawSyncManager:
 
         for law in MONITORED_LAWS:
             law_name = law["law_name"]
-            xml_data = self.client.get_law_text(law_name=law_name)
+            is_admrul = law.get("target") == "admrul"
+
+            # 행정규칙(고시)는 별도 API 엔드포인트 사용
+            if is_admrul:
+                xml_data = self.client.get_admrul_text(law_name)
+            else:
+                xml_data = self.client.get_law_text(law_name=law_name)
 
             for article in law["articles"]:
                 results["total_checked"] += 1
                 detail = {"law_name": law_name, "article": article}
 
                 if xml_data:
-                    content = self.client.get_article_text(xml_data, article)
+                    if is_admrul:
+                        # 고시는 전문 요약으로 변경 감지
+                        content = self.client.get_full_text_summary(xml_data, max_chars=800)
+                    else:
+                        content = self.client.get_article_text(xml_data, article)
+
                     if content:
                         changed = self._record_check(law_name, article, content)
                         detail["status"] = "changed" if changed else "unchanged"
@@ -180,13 +264,23 @@ class LawSyncManager:
 
         return results
 
-    def check_single(self, law_name, article):
+    def check_single(self, law_name: str, article: str):
         """단일 조문의 변경을 확인한다."""
-        xml_data = self.client.get_law_text(law_name=law_name)
+        # 행정규칙 여부 판단
+        is_admrul = any(
+            law.get("target") == "admrul" and law["law_name"] == law_name
+            for law in MONITORED_LAWS
+        )
+
+        if is_admrul:
+            xml_data = self.client.get_admrul_text(law_name)
+            content = self.client.get_full_text_summary(xml_data, max_chars=800) if xml_data else None
+        else:
+            xml_data = self.client.get_law_text(law_name=law_name)
+            content = self.client.get_article_text(xml_data, article) if xml_data else None
+
         if not xml_data:
             return {"status": "api_error", "law_name": law_name, "article": article}
-
-        content = self.client.get_article_text(xml_data, article)
         if not content:
             return {"status": "article_not_found", "law_name": law_name, "article": article}
 
