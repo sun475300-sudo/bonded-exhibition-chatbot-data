@@ -1833,7 +1833,42 @@ def admin_law_updates_acknowledge():
 
 # --- 국가법령정보센터 API 동기화 ---
 from src.law_api_sync import LawSyncManager
+from src.law_faq_bridge import LawFAQBridge, get_bridge as get_law_bridge
+
 law_sync_manager = LawSyncManager()
+law_faq_bridge = get_law_bridge()
+
+
+def _start_law_sync_scheduler(interval_hours: float = 24.0):
+    """법령 동기화 자동 스케줄러를 백그라운드 스레드로 시작한다."""
+    import threading
+
+    def _run():
+        import time
+        logger.info(
+            "법령 자동 동기화 스케줄러 시작 (주기: %.1f시간)", interval_hours
+        )
+        while True:
+            try:
+                time.sleep(interval_hours * 3600)
+                logger.info("법령 자동 동기화 실행 중...")
+                result = law_faq_bridge.run_full_sync()
+                logger.info(
+                    "법령 자동 동기화 완료: 변경 %d개, FAQ 플래그 %d개",
+                    result.get("changes_detected", 0),
+                    result.get("faq_items_flagged", 0),
+                )
+            except Exception as exc:
+                logger.error("법령 자동 동기화 오류: %s", exc, exc_info=True)
+
+    t = threading.Thread(target=_run, daemon=True, name="LawSyncScheduler")
+    t.start()
+    logger.info("법령 동기화 스케줄러 스레드 시작 완료")
+
+
+# 서버 시작 시 자동 스케줄러 활성화 (환경변수로 제어 가능)
+_law_sync_interval = float(os.environ.get("LAW_SYNC_INTERVAL_HOURS", "24"))
+_start_law_sync_scheduler(interval_hours=_law_sync_interval)
 
 
 @app.route("/api/admin/law-sync/check", methods=["POST"])
@@ -1861,6 +1896,66 @@ def admin_law_sync_apply():
         })
     except Exception as e:
         logger.error(f"법령 동기화 실패: {e}")
+        return jsonify({"error": str(e)}), 500
+
+
+@app.route("/api/admin/law-sync/full", methods=["POST"])
+@jwt_auth.require_auth()
+def admin_law_sync_full():
+    """법령 API 전체 파이프라인: 변경 감지 → legal_references 업데이트 → FAQ 플래그."""
+    try:
+        result = law_faq_bridge.run_full_sync()
+        return jsonify(result)
+    except Exception as e:
+        logger.error(f"법령 전체 동기화 실패: {e}", exc_info=True)
+        return jsonify({"error": str(e)}), 500
+
+
+@app.route("/api/admin/law-sync/status", methods=["GET"])
+@jwt_auth.require_auth()
+def admin_law_sync_status():
+    """법령 동기화 현황 및 플래그된 FAQ 목록을 반환한다."""
+    try:
+        return jsonify(law_faq_bridge.get_sync_status())
+    except Exception as e:
+        logger.error(f"법령 동기화 상태 조회 실패: {e}")
+        return jsonify({"error": str(e)}), 500
+
+
+@app.route("/api/admin/law-sync/faq-update", methods=["POST"])
+@jwt_auth.require_auth()
+def admin_law_sync_faq_update():
+    """특정 FAQ 항목의 답변을 수동으로 업데이트한다."""
+    data = request.get_json() or {}
+    faq_id = data.get("faq_id", "")
+    new_answer = data.get("answer", "")
+    reason = data.get("reason", "수동 업데이트")
+    if not faq_id or not new_answer:
+        return jsonify({"error": "faq_id와 answer가 필요합니다."}), 400
+    try:
+        success = law_faq_bridge.update_faq_answer(
+            faq_id=faq_id,
+            new_answer=new_answer,
+            reason=reason,
+            auto_applied=False,
+        )
+        if success:
+            return jsonify({"success": True, "faq_id": faq_id})
+        return jsonify({"error": f"FAQ ID '{faq_id}' 를 찾을 수 없습니다."}), 404
+    except Exception as e:
+        logger.error(f"FAQ 답변 업데이트 실패: {e}")
+        return jsonify({"error": str(e)}), 500
+
+
+@app.route("/api/admin/law-sync/update-history", methods=["GET"])
+@jwt_auth.require_auth()
+def admin_law_sync_update_history():
+    """FAQ 업데이트 이력을 반환한다."""
+    limit = request.args.get("limit", 50, type=int)
+    try:
+        return jsonify({"history": law_faq_bridge.get_update_history(limit=limit)})
+    except Exception as e:
+        logger.error(f"업데이트 이력 조회 실패: {e}")
         return jsonify({"error": str(e)}), 500
 
 
