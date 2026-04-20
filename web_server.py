@@ -1832,8 +1832,9 @@ def admin_law_updates_acknowledge():
 
 
 # --- 국가법령정보센터 API 동기화 ---
-from src.law_api_sync import LawSyncManager
+from src.law_api_sync import LawSyncManager, LawFAQUpdater
 law_sync_manager = LawSyncManager()
+law_faq_updater = LawFAQUpdater(sync_manager=law_sync_manager)
 
 
 @app.route("/api/admin/law-sync/check", methods=["POST"])
@@ -1877,6 +1878,22 @@ def admin_law_sync_history():
 def admin_law_sync_monitored():
     """모니터링 대상 법령 목록을 조회한다."""
     return jsonify({"laws": law_sync_manager.get_monitored_laws()})
+
+
+@app.route("/api/admin/law-sync/update-all", methods=["POST"])
+@jwt_auth.require_auth()
+def admin_law_sync_update_all():
+    """법령 API 확인 → legal_references·RAG·FAQ 전체 업데이트 파이프라인 실행.
+
+    변경이 감지된 조문에 대해 자동으로 데이터를 최신화하고
+    결과 요약을 반환한다.
+    """
+    try:
+        result = law_faq_updater.run_full_update()
+        return jsonify(result)
+    except Exception as e:
+        logger.error(f"전체 법령 업데이트 실패: {e}")
+        return jsonify({"error": str(e)}), 500
 
 
 @app.route("/api/admin/backup", methods=["POST"])
