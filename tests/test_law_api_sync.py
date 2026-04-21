@@ -285,3 +285,44 @@ class TestFAQCorrectness:
         assert "제5장" in aq["answer"]
         # 관세법 제119조가 legal_basis로 추가되었는지 확인
         assert any("제119조" in basis for basis in aq["legal_basis"])
+
+    def test_import_terminology_note_in_ae(self):
+        """FAQ AE(판매 전 수입면허 신청 절차)에 현행 용어(수입신고 수리) 안내가 있어야 한다."""
+        faq_path = os.path.join(
+            os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
+            "data", "faq.json",
+        )
+        with open(faq_path, "r", encoding="utf-8") as f:
+            data = json.load(f)
+        ae = next((item for item in data["items"] if item["id"] == "AE"), None)
+        assert ae is not None
+        assert "수입신고 수리" in ae["answer"]
+
+
+class TestLegalReferencesURLs:
+    """legal_references.json의 URL이 표준 형식을 따르는지 검증."""
+
+    def _load_refs(self):
+        path = os.path.join(
+            os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
+            "data", "legal_references.json",
+        )
+        with open(path, "r", encoding="utf-8") as f:
+            return json.load(f).get("references", [])
+
+    def test_customs_act_urls_use_lslinkproc(self):
+        """관세법 조항 URL은 lsLinkProc.do 표준 형식을 사용해야 한다."""
+        refs = self._load_refs()
+        for ref in refs:
+            if ref.get("law_name") in ("관세법", "관세법 시행령"):
+                url = ref.get("url", "")
+                # URL이 비어있지 않으면 반드시 law.go.kr 및 lsLinkProc.do를 포함해야 함
+                if url:
+                    assert "law.go.kr" in url, f"{ref['id']} has non-law.go.kr URL: {url}"
+                    assert "lsLinkProc.do" in url, f"{ref['id']} is not in canonical form: {url}"
+
+    def test_article_119_reference_exists(self):
+        """관세법 제119조(불복의 신청) 참조가 추가되었는지 검증."""
+        refs = self._load_refs()
+        ids = {ref.get("id") for ref in refs}
+        assert "customs_act_119" in ids

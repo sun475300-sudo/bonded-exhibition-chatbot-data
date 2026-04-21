@@ -4,6 +4,23 @@
 
 형식: [Keep a Changelog](https://keepachangelog.com/ko/1.1.0/)
 
+## [14.3.0] - 2026-04-21
+
+### Added
+- 관세법 제119조(불복의 신청) `customs_act_119` 항목을 legal_references.json에 추가.
+- FAQ/법령 URL 정확성 검증 테스트 3건 추가 (`TestLegalReferencesURLs`,
+  `TestFAQCorrectness.test_import_terminology_note_in_ae`).
+
+### Changed
+- `legal_references.json`의 관세법·시행령 조항 URL을 비표준 `lsInfoP.do`·
+  `lsLawLinkInfo.do` 형식에서 일관된 `lsLinkProc.do?lsNm=...&joNo=...` 형식으로
+  통일. (빈 URL도 모두 채움.) 법령 업데이트 알림에서 사용자가 국가법령정보센터
+  해당 조문 페이지로 한 번에 이동할 수 있도록 함.
+- FAQ 시행령 제101조·제102조 요약에 `수입신고 수리(구 '수입면허')` 용어 병기.
+- FAQ **AE(판매 전 수입면허 신청 절차)** 답변을 현행 실무 용어(`수입신고
+  수리`)로 재작성하고 시행령 구 표현과의 관계를 `notes`에 부기. 키워드에
+  `수입신고 수리` 추가.
+
 ## [14.2.0] - 2026-04-21
 
 ### Added
