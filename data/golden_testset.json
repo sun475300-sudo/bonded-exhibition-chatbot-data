@@ -17,114 +17,803 @@
     "DISPLAY_USE": "EXHIBITION"
   },
   "items": [
-    {"question": "보세전시장이 무엇인가요?", "expected_category": "GENERAL", "expected_faq_id": "A", "type": "exact"},
-    {"question": "보세전시장 뜻이 뭐예요?", "expected_category": "GENERAL", "expected_faq_id": "A", "type": "variant"},
-    {"question": "보세전시장의 개념에 대해 알려주세요.", "expected_category": "GENERAL", "expected_faq_id": "A", "type": "variant"},
-    {"question": "보세전시장과 보세창고는 어떻게 다른가요?", "expected_category": "GENERAL", "expected_faq_id": "T", "type": "exact"},
-    {"question": "보세창고와 보세전시장 차이점은?", "expected_category": "GENERAL", "expected_faq_id": "T", "type": "variant"},
-    {"question": "보세전시장은 누가 이용할 수 있나요?", "expected_category": "GENERAL", "expected_faq_id": "U", "type": "exact"},
-    {"question": "보세전시장 이용 자격이 어떻게 되나요?", "expected_category": "GENERAL", "expected_faq_id": "U", "type": "variant"},
-    {"question": "보세전시장에서 내국물품도 전시할 수 있나요?", "expected_category": "GENERAL", "expected_faq_id": "AC", "type": "exact"},
-    {"question": "보세전시장에서 행사를 주최하려면 어떤 준비가 필요한가요?", "expected_category": "GENERAL", "expected_faq_id": "AJ", "type": "exact"},
-    {"question": "보세전시장의 운영인 자격 요건은 무엇인가요?", "expected_category": "GENERAL", "expected_faq_id": "AR", "type": "exact"},
-
-    {"question": "보세전시장에 물품을 반입하거나 반출하려면 신고가 필요한가요?", "expected_category": "IMPORT_EXPORT", "expected_faq_id": "B", "type": "exact"},
-    {"question": "물품 반입할 때 신고해야 하나요?", "expected_category": "IMPORT_EXPORT", "expected_faq_id": "B", "type": "variant"},
-    {"question": "반출입신고는 의무인가요?", "expected_category": "IMPORT_EXPORT", "expected_faq_id": "B", "type": "variant"},
-    {"question": "전시가 끝난 물품을 다시 해외로 보내려면 어떻게 하나요?", "expected_category": "IMPORT_EXPORT", "expected_faq_id": "V", "type": "exact"},
-    {"question": "전시 종료 후 해외로 반송하는 절차는?", "expected_category": "IMPORT_EXPORT", "expected_faq_id": "V", "type": "variant"},
-    {"question": "전시 종료 후 물품이 남으면 어떻게 처리하나요?", "expected_category": "IMPORT_EXPORT", "expected_faq_id": "W", "type": "exact"},
-    {"question": "보세전시장 반입 물품에 대해 세관 검사는 어떻게 이루어지나요?", "expected_category": "IMPORT_EXPORT", "expected_faq_id": "AB", "type": "exact"},
-    {"question": "반입 물품의 가액 신고는 어떻게 하나요?", "expected_category": "IMPORT_EXPORT", "expected_faq_id": "AL", "type": "exact"},
-    {"question": "보세전시장 간 물품 이동은 가능한가요?", "expected_category": "IMPORT_EXPORT", "expected_faq_id": "AS", "type": "exact"},
-    {"question": "다른 보세전시장으로 물품을 옮길 수 있나요?", "expected_category": "IMPORT_EXPORT", "expected_faq_id": "AS", "type": "variant"},
-
-    {"question": "보세전시장에 전시한 물품을 현장에서 바로 판매할 수 있나요?", "expected_category": "SALES", "expected_faq_id": "C", "type": "exact"},
-    {"question": "현장 직매가 가능한가요?", "expected_category": "SALES", "expected_faq_id": "C", "type": "variant"},
-    {"question": "전시물품 즉석 판매되나요?", "expected_category": "SALES", "expected_faq_id": "C", "type": "variant"},
-    {"question": "보세전시장에서 판매 계약만 체결하고 나중에 통관할 수 있나요?", "expected_category": "SALES", "expected_faq_id": "X", "type": "exact"},
-    {"question": "계약만 체결하고 인도는 나중에 해도 되나요?", "expected_category": "SALES", "expected_faq_id": "X", "type": "variant"},
-    {"question": "판매 대금은 어떻게 정산하나요?", "expected_category": "SALES", "expected_faq_id": "AD", "type": "exact"},
-    {"question": "결제 대금 수금은 어떻게 해야 하나요?", "expected_category": "SALES", "expected_faq_id": "AD", "type": "variant"},
-    {"question": "판매 전 수입면허 신청 절차는?", "expected_category": "SALES", "expected_faq_id": "AE", "type": "exact"},
-    {"question": "수입면허 신청은 어떻게 하나요?", "expected_category": "SALES", "expected_faq_id": "AE", "type": "variant"},
-    {"question": "통관 전 판매 인도 가능해요?", "expected_category": "SALES", "expected_faq_id": "C", "type": "ambiguous"},
-
-    {"question": "전시물 일부를 견본품으로 밖에 가져가도 되나요?", "expected_category": "SAMPLE", "expected_faq_id": "D", "type": "exact"},
-    {"question": "홍보용 샘플을 밖으로 가져가도 되나요?", "expected_category": "SAMPLE", "expected_faq_id": "D", "type": "variant"},
-    {"question": "견본품 반출 허가를 받으면 관세를 내야 하나요?", "expected_category": "SAMPLE", "expected_faq_id": "Z", "type": "exact"},
-    {"question": "견본품 세금은 어떻게 되나요?", "expected_category": "SAMPLE", "expected_faq_id": "Z", "type": "variant"},
-    {"question": "견본품 수량 제한이 있나요?", "expected_category": "SAMPLE", "expected_faq_id": "AF", "type": "exact"},
-    {"question": "견본품 몇 개까지 반출 가능한가요?", "expected_category": "SAMPLE", "expected_faq_id": "AF", "type": "variant"},
-    {"question": "견본품 반출 후 반환 의무가 있나요?", "expected_category": "SAMPLE", "expected_faq_id": "AG", "type": "exact"},
-    {"question": "샘플을 반납해야 하나요?", "expected_category": "SAMPLE", "expected_faq_id": "AG", "type": "variant"},
-    {"question": "견본품 반출 허가 신청은 어떻게 하나요?", "expected_category": "SAMPLE", "expected_faq_id": "M", "type": "exact"},
-    {"question": "샘플 반출 허가 어디서 받나요?", "expected_category": "SAMPLE", "expected_faq_id": "M", "type": "variant"},
-
-    {"question": "시식용 식품을 보세전시장에 들여오는 경우 요건확인은 생략되나요?", "expected_category": "FOOD_TASTING", "expected_faq_id": "E", "type": "exact"},
-    {"question": "시식용 식품 세관장확인 받나요?", "expected_category": "FOOD_TASTING", "expected_faq_id": "E", "type": "variant"},
-    {"question": "식품 시식 요건확인 예외 있나요?", "expected_category": "FOOD_TASTING", "expected_faq_id": "E", "type": "variant"},
-    {"question": "시식용 식품은 행사 후 어떻게 처리해야 하나요?", "expected_category": "FOOD_TASTING", "expected_faq_id": "Y", "type": "exact"},
-    {"question": "남은 시식 식품 폐기 절차가 궁금해요.", "expected_category": "FOOD_TASTING", "expected_faq_id": "Y", "type": "variant"},
-    {"question": "시식용 식품의 수량 제한이 있나요?", "expected_category": "FOOD_TASTING", "expected_faq_id": "AH", "type": "exact"},
-    {"question": "시식 식품 얼마나 반입할 수 있나요?", "expected_category": "FOOD_TASTING", "expected_faq_id": "AH", "type": "variant"},
-    {"question": "시식 행사 사전 신고가 필요한가요?", "expected_category": "FOOD_TASTING", "expected_faq_id": "AI", "type": "exact"},
-    {"question": "시식 행사 하기 전에 어떤 신고가 필요해요?", "expected_category": "FOOD_TASTING", "expected_faq_id": "AI", "type": "variant"},
-    {"question": "시식용 식품에 한글 표시 라벨이 필요한가요?", "expected_category": "FOOD_TASTING", "expected_faq_id": "AV", "type": "exact"},
-
-    {"question": "보세전시장 특허기간은 어떻게 되나요?", "expected_category": "LICENSE", "expected_faq_id": "F", "type": "exact"},
-    {"question": "특허 기간이 얼마나 되나요?", "expected_category": "LICENSE", "expected_faq_id": "F", "type": "variant"},
-    {"question": "보세전시장 설치·운영 특허를 받으려면 어디를 봐야 하나요?", "expected_category": "LICENSE", "expected_faq_id": "G", "type": "exact"},
-    {"question": "보세전시장 특허 신청하려면 어디를 봐야 하나요?", "expected_category": "LICENSE", "expected_faq_id": "G", "type": "variant"},
-    {"question": "보세전시장 특허를 갱신하거나 연장할 수 있나요?", "expected_category": "LICENSE", "expected_faq_id": "AA", "type": "exact"},
-    {"question": "특허 연장이 가능한가요?", "expected_category": "LICENSE", "expected_faq_id": "AA", "type": "variant"},
-    {"question": "특허 취소 사유는 무엇인가요?", "expected_category": "LICENSE", "expected_faq_id": "AK", "type": "exact"},
-    {"question": "특허가 취소될 수 있는 경우는?", "expected_category": "LICENSE", "expected_faq_id": "AK", "type": "variant"},
-    {"question": "보세전시장 특허 신청 수수료가 있나요?", "expected_category": "LICENSE", "expected_faq_id": "AT", "type": "exact"},
-    {"question": "특허 신청 비용이 드나요?", "expected_category": "LICENSE", "expected_faq_id": "AT", "type": "variant"},
-
-    {"question": "보세전시장에서 전시할 수 있는 물품에 제한이 있나요?", "expected_category": "DISPLAY_USE", "expected_faq_id": "H", "type": "exact"},
-    {"question": "전시할 수 있는 물품 제한이 있을까요?", "expected_category": "DISPLAY_USE", "expected_faq_id": "H", "type": "variant"},
-    {"question": "보세전시장에 장치된 물품의 사용 범위는 어떻게 되나요?", "expected_category": "DISPLAY_USE", "expected_faq_id": "I", "type": "exact"},
-    {"question": "장치된 물품 어디까지 사용할 수 있나요?", "expected_category": "DISPLAY_USE", "expected_faq_id": "I", "type": "variant"},
-    {"question": "보세전시장에서 시연(데모)을 할 수 있나요?", "expected_category": "DISPLAY_USE", "expected_faq_id": "J", "type": "exact"},
-    {"question": "시범 데모 가능한가요?", "expected_category": "DISPLAY_USE", "expected_faq_id": "J", "type": "variant"},
-    {"question": "전시 기간 중 물품 교체가 가능한가요?", "expected_category": "DISPLAY_USE", "expected_faq_id": "AM", "type": "exact"},
-    {"question": "전시물을 중간에 바꿀 수 있나요?", "expected_category": "DISPLAY_USE", "expected_faq_id": "AM", "type": "variant"},
-    {"question": "전시장 내 보관 시 주의사항은?", "expected_category": "DISPLAY_USE", "expected_faq_id": "AN", "type": "exact"},
-    {"question": "전시장에서 촬영이나 홍보 활동이 가능한가요?", "expected_category": "DISPLAY_USE", "expected_faq_id": "AU", "type": "exact"},
-
-    {"question": "보세전시장 반출입신고서는 어떤 서류인가요?", "expected_category": "DOCUMENTS", "expected_faq_id": "K", "type": "exact"},
-    {"question": "반출입신고서 양식은 어떻게 되나요?", "expected_category": "DOCUMENTS", "expected_faq_id": "K", "type": "variant"},
-    {"question": "보세전시장 특허 신청 시 어떤 서류가 필요한가요?", "expected_category": "DOCUMENTS", "expected_faq_id": "L", "type": "exact"},
-    {"question": "특허 신청 구비서류 알려주세요.", "expected_category": "DOCUMENTS", "expected_faq_id": "L", "type": "variant"},
-    {"question": "수입면허 신청에 필요한 서류는?", "expected_category": "DOCUMENTS", "expected_faq_id": "AO", "type": "exact"},
-    {"question": "수입신고서 외에 필요한 서류 뭐가 있어요?", "expected_category": "DOCUMENTS", "expected_faq_id": "AO", "type": "variant"},
-    {"question": "보세전시장 운영 종료 보고서는 어떻게 제출하나요?", "expected_category": "DOCUMENTS", "expected_faq_id": "AW", "type": "exact"},
-    {"question": "운영 종료 결과 보고는 어떻게 하나요?", "expected_category": "DOCUMENTS", "expected_faq_id": "AW", "type": "variant"},
-    {"question": "인보이스나 송장도 제출해야 하나요?", "expected_category": "DOCUMENTS", "expected_faq_id": "AO", "type": "ambiguous"},
-    {"question": "특허 신청서 첨부서류 목록이 있나요?", "expected_category": "DOCUMENTS", "expected_faq_id": "L", "type": "variant"},
-
-    {"question": "보세전시장에서 허가 없이 물품을 반출하면 어떻게 되나요?", "expected_category": "PENALTIES", "expected_faq_id": "N", "type": "exact"},
-    {"question": "무허가 반출 시 처벌이 있나요?", "expected_category": "PENALTIES", "expected_faq_id": "N", "type": "variant"},
-    {"question": "수입면허 없이 판매용 물품을 사용하면 제재가 있나요?", "expected_category": "PENALTIES", "expected_faq_id": "O", "type": "exact"},
-    {"question": "면허 없이 판매하면 어떻게 제재 받나요?", "expected_category": "PENALTIES", "expected_faq_id": "O", "type": "variant"},
-    {"question": "보세전시장 운영인이 의무를 위반하면 어떤 처분을 받나요?", "expected_category": "PENALTIES", "expected_faq_id": "P", "type": "exact"},
-    {"question": "운영인 의무위반시 특허 취소되나요?", "expected_category": "PENALTIES", "expected_faq_id": "P", "type": "variant"},
-    {"question": "과태료 금액은 어떻게 결정되나요?", "expected_category": "PENALTIES", "expected_faq_id": "AP", "type": "exact"},
-    {"question": "과태료가 얼마나 부과되나요?", "expected_category": "PENALTIES", "expected_faq_id": "AP", "type": "variant"},
-    {"question": "밀수출입죄가 적용될 수 있나요?", "expected_category": "PENALTIES", "expected_faq_id": "N", "type": "edge"},
-    {"question": "업무 정지 처분 기준이 있나요?", "expected_category": "PENALTIES", "expected_faq_id": "P", "type": "variant"},
-
-    {"question": "보세전시장 관련 문의는 어디에 하면 되나요?", "expected_category": "CONTACT", "expected_faq_id": "Q", "type": "exact"},
-    {"question": "관세청 고객지원센터 전화번호가 어떻게 되나요?", "expected_category": "CONTACT", "expected_faq_id": "Q", "type": "variant"},
-    {"question": "UNI-PASS 사용 중 오류가 나면 어디에 연락하나요?", "expected_category": "CONTACT", "expected_faq_id": "R", "type": "exact"},
-    {"question": "유니패스 시스템 오류 신고는 어디로 하나요?", "expected_category": "CONTACT", "expected_faq_id": "R", "type": "variant"},
-    {"question": "보세전시장 특허 관련 담당 부서가 어디인가요?", "expected_category": "CONTACT", "expected_faq_id": "S", "type": "exact"},
-    {"question": "보세산업과는 무엇을 담당하나요?", "expected_category": "CONTACT", "expected_faq_id": "S", "type": "variant"},
-    {"question": "관세 불복 절차는 어떻게 되나요?", "expected_category": "CONTACT", "expected_faq_id": "AQ", "type": "exact"},
-    {"question": "이의신청은 어떻게 제기하나요?", "expected_category": "CONTACT", "expected_faq_id": "AQ", "type": "variant"},
-    {"question": "관세사에게 대행을 맡길 수 있나요?", "expected_category": "CONTACT", "expected_faq_id": "AX", "type": "exact"},
-    {"question": "관세사 위임이 가능한가요?", "expected_category": "CONTACT", "expected_faq_id": "AX", "type": "variant"}
+    {
+      "question": "보세전시장이 무엇인가요?",
+      "expected_category": "GENERAL",
+      "expected_faq_id": "A",
+      "type": "exact"
+    },
+    {
+      "question": "보세전시장 뜻이 뭐예요?",
+      "expected_category": "GENERAL",
+      "expected_faq_id": "A",
+      "type": "variant"
+    },
+    {
+      "question": "보세전시장의 개념에 대해 알려주세요.",
+      "expected_category": "GENERAL",
+      "expected_faq_id": "A",
+      "type": "variant"
+    },
+    {
+      "question": "보세전시장과 보세창고는 어떻게 다른가요?",
+      "expected_category": "GENERAL",
+      "expected_faq_id": "T",
+      "type": "exact"
+    },
+    {
+      "question": "보세창고와 보세전시장 차이점은?",
+      "expected_category": "GENERAL",
+      "expected_faq_id": "T",
+      "type": "variant"
+    },
+    {
+      "question": "보세전시장은 누가 이용할 수 있나요?",
+      "expected_category": "GENERAL",
+      "expected_faq_id": "U",
+      "type": "exact"
+    },
+    {
+      "question": "보세전시장 이용 자격이 어떻게 되나요?",
+      "expected_category": "GENERAL",
+      "expected_faq_id": "U",
+      "type": "variant"
+    },
+    {
+      "question": "보세전시장에서 내국물품도 전시할 수 있나요?",
+      "expected_category": "GENERAL",
+      "expected_faq_id": "AC",
+      "type": "exact"
+    },
+    {
+      "question": "보세전시장에서 행사를 주최하려면 어떤 준비가 필요한가요?",
+      "expected_category": "GENERAL",
+      "expected_faq_id": "AJ",
+      "type": "exact"
+    },
+    {
+      "question": "보세전시장의 운영인 자격 요건은 무엇인가요?",
+      "expected_category": "GENERAL",
+      "expected_faq_id": "AR",
+      "type": "exact"
+    },
+    {
+      "question": "보세전시장에 물품을 반입하거나 반출하려면 신고가 필요한가요?",
+      "expected_category": "IMPORT_EXPORT",
+      "expected_faq_id": "B",
+      "type": "exact"
+    },
+    {
+      "question": "물품 반입할 때 신고해야 하나요?",
+      "expected_category": "IMPORT_EXPORT",
+      "expected_faq_id": "B",
+      "type": "variant"
+    },
+    {
+      "question": "반출입신고는 의무인가요?",
+      "expected_category": "IMPORT_EXPORT",
+      "expected_faq_id": "B",
+      "type": "variant"
+    },
+    {
+      "question": "전시가 끝난 물품을 다시 해외로 보내려면 어떻게 하나요?",
+      "expected_category": "IMPORT_EXPORT",
+      "expected_faq_id": "V",
+      "type": "exact"
+    },
+    {
+      "question": "전시 종료 후 해외로 반송하는 절차는?",
+      "expected_category": "IMPORT_EXPORT",
+      "expected_faq_id": "V",
+      "type": "variant"
+    },
+    {
+      "question": "전시 종료 후 물품이 남으면 어떻게 처리하나요?",
+      "expected_category": "IMPORT_EXPORT",
+      "expected_faq_id": "W",
+      "type": "exact"
+    },
+    {
+      "question": "보세전시장 반입 물품에 대해 세관 검사는 어떻게 이루어지나요?",
+      "expected_category": "IMPORT_EXPORT",
+      "expected_faq_id": "AB",
+      "type": "exact"
+    },
+    {
+      "question": "반입 물품의 가액 신고는 어떻게 하나요?",
+      "expected_category": "IMPORT_EXPORT",
+      "expected_faq_id": "AL",
+      "type": "exact"
+    },
+    {
+      "question": "보세전시장 간 물품 이동은 가능한가요?",
+      "expected_category": "IMPORT_EXPORT",
+      "expected_faq_id": "AS",
+      "type": "exact"
+    },
+    {
+      "question": "다른 보세전시장으로 물품을 옮길 수 있나요?",
+      "expected_category": "IMPORT_EXPORT",
+      "expected_faq_id": "AS",
+      "type": "variant"
+    },
+    {
+      "question": "보세전시장에 전시한 물품을 현장에서 바로 판매할 수 있나요?",
+      "expected_category": "SALES",
+      "expected_faq_id": "C",
+      "type": "exact"
+    },
+    {
+      "question": "현장 직매가 가능한가요?",
+      "expected_category": "SALES",
+      "expected_faq_id": "C",
+      "type": "variant"
+    },
+    {
+      "question": "전시물품 즉석 판매되나요?",
+      "expected_category": "SALES",
+      "expected_faq_id": "C",
+      "type": "variant"
+    },
+    {
+      "question": "보세전시장에서 판매 계약만 체결하고 나중에 통관할 수 있나요?",
+      "expected_category": "SALES",
+      "expected_faq_id": "X",
+      "type": "exact"
+    },
+    {
+      "question": "계약만 체결하고 인도는 나중에 해도 되나요?",
+      "expected_category": "SALES",
+      "expected_faq_id": "X",
+      "type": "variant"
+    },
+    {
+      "question": "판매 대금은 어떻게 정산하나요?",
+      "expected_category": "SALES",
+      "expected_faq_id": "AD",
+      "type": "exact"
+    },
+    {
+      "question": "결제 대금 수금은 어떻게 해야 하나요?",
+      "expected_category": "SALES",
+      "expected_faq_id": "AD",
+      "type": "variant"
+    },
+    {
+      "question": "판매 전 수입면허 신청 절차는?",
+      "expected_category": "SALES",
+      "expected_faq_id": "AE",
+      "type": "exact"
+    },
+    {
+      "question": "수입면허 신청은 어떻게 하나요?",
+      "expected_category": "SALES",
+      "expected_faq_id": "AE",
+      "type": "variant"
+    },
+    {
+      "question": "통관 전 판매 인도 가능해요?",
+      "expected_category": "SALES",
+      "expected_faq_id": "C",
+      "type": "ambiguous"
+    },
+    {
+      "question": "전시물 일부를 견본품으로 밖에 가져가도 되나요?",
+      "expected_category": "SAMPLE",
+      "expected_faq_id": "D",
+      "type": "exact"
+    },
+    {
+      "question": "홍보용 샘플을 밖으로 가져가도 되나요?",
+      "expected_category": "SAMPLE",
+      "expected_faq_id": "D",
+      "type": "variant"
+    },
+    {
+      "question": "견본품 반출 허가를 받으면 관세를 내야 하나요?",
+      "expected_category": "SAMPLE",
+      "expected_faq_id": "Z",
+      "type": "exact"
+    },
+    {
+      "question": "견본품 세금은 어떻게 되나요?",
+      "expected_category": "SAMPLE",
+      "expected_faq_id": "Z",
+      "type": "variant"
+    },
+    {
+      "question": "견본품 수량 제한이 있나요?",
+      "expected_category": "SAMPLE",
+      "expected_faq_id": "AF",
+      "type": "exact"
+    },
+    {
+      "question": "견본품 몇 개까지 반출 가능한가요?",
+      "expected_category": "SAMPLE",
+      "expected_faq_id": "AF",
+      "type": "variant"
+    },
+    {
+      "question": "견본품 반출 후 반환 의무가 있나요?",
+      "expected_category": "SAMPLE",
+      "expected_faq_id": "AG",
+      "type": "exact"
+    },
+    {
+      "question": "샘플을 반납해야 하나요?",
+      "expected_category": "SAMPLE",
+      "expected_faq_id": "AG",
+      "type": "variant"
+    },
+    {
+      "question": "견본품 반출 허가 신청은 어떻게 하나요?",
+      "expected_category": "SAMPLE",
+      "expected_faq_id": "M",
+      "type": "exact"
+    },
+    {
+      "question": "샘플 반출 허가 어디서 받나요?",
+      "expected_category": "SAMPLE",
+      "expected_faq_id": "M",
+      "type": "variant"
+    },
+    {
+      "question": "시식용 식품을 보세전시장에 들여오는 경우 요건확인은 생략되나요?",
+      "expected_category": "FOOD_TASTING",
+      "expected_faq_id": "E",
+      "type": "exact"
+    },
+    {
+      "question": "시식용 식품 세관장확인 받나요?",
+      "expected_category": "FOOD_TASTING",
+      "expected_faq_id": "E",
+      "type": "variant"
+    },
+    {
+      "question": "식품 시식 요건확인 예외 있나요?",
+      "expected_category": "FOOD_TASTING",
+      "expected_faq_id": "E",
+      "type": "variant"
+    },
+    {
+      "question": "시식용 식품은 행사 후 어떻게 처리해야 하나요?",
+      "expected_category": "FOOD_TASTING",
+      "expected_faq_id": "Y",
+      "type": "exact"
+    },
+    {
+      "question": "남은 시식 식품 폐기 절차가 궁금해요.",
+      "expected_category": "FOOD_TASTING",
+      "expected_faq_id": "Y",
+      "type": "variant"
+    },
+    {
+      "question": "시식용 식품의 수량 제한이 있나요?",
+      "expected_category": "FOOD_TASTING",
+      "expected_faq_id": "AH",
+      "type": "exact"
+    },
+    {
+      "question": "시식 식품 얼마나 반입할 수 있나요?",
+      "expected_category": "FOOD_TASTING",
+      "expected_faq_id": "AH",
+      "type": "variant"
+    },
+    {
+      "question": "시식 행사 사전 신고가 필요한가요?",
+      "expected_category": "FOOD_TASTING",
+      "expected_faq_id": "AI",
+      "type": "exact"
+    },
+    {
+      "question": "시식 행사 하기 전에 어떤 신고가 필요해요?",
+      "expected_category": "FOOD_TASTING",
+      "expected_faq_id": "AI",
+      "type": "variant"
+    },
+    {
+      "question": "시식용 식품에 한글 표시 라벨이 필요한가요?",
+      "expected_category": "FOOD_TASTING",
+      "expected_faq_id": "AV",
+      "type": "exact"
+    },
+    {
+      "question": "보세전시장 특허기간은 어떻게 되나요?",
+      "expected_category": "LICENSE",
+      "expected_faq_id": "F",
+      "type": "exact"
+    },
+    {
+      "question": "특허 기간이 얼마나 되나요?",
+      "expected_category": "LICENSE",
+      "expected_faq_id": "F",
+      "type": "variant"
+    },
+    {
+      "question": "보세전시장 설치·운영 특허를 받으려면 어디를 봐야 하나요?",
+      "expected_category": "LICENSE",
+      "expected_faq_id": "G",
+      "type": "exact"
+    },
+    {
+      "question": "보세전시장 특허 신청하려면 어디를 봐야 하나요?",
+      "expected_category": "LICENSE",
+      "expected_faq_id": "G",
+      "type": "variant"
+    },
+    {
+      "question": "보세전시장 특허를 갱신하거나 연장할 수 있나요?",
+      "expected_category": "LICENSE",
+      "expected_faq_id": "AA",
+      "type": "exact"
+    },
+    {
+      "question": "특허 연장이 가능한가요?",
+      "expected_category": "LICENSE",
+      "expected_faq_id": "AA",
+      "type": "variant"
+    },
+    {
+      "question": "특허 취소 사유는 무엇인가요?",
+      "expected_category": "LICENSE",
+      "expected_faq_id": "AK",
+      "type": "exact"
+    },
+    {
+      "question": "특허가 취소될 수 있는 경우는?",
+      "expected_category": "LICENSE",
+      "expected_faq_id": "AK",
+      "type": "variant"
+    },
+    {
+      "question": "보세전시장 특허 신청 수수료가 있나요?",
+      "expected_category": "LICENSE",
+      "expected_faq_id": "AT",
+      "type": "exact"
+    },
+    {
+      "question": "특허 신청 비용이 드나요?",
+      "expected_category": "LICENSE",
+      "expected_faq_id": "AT",
+      "type": "variant"
+    },
+    {
+      "question": "보세전시장에서 전시할 수 있는 물품에 제한이 있나요?",
+      "expected_category": "DISPLAY_USE",
+      "expected_faq_id": "H",
+      "type": "exact"
+    },
+    {
+      "question": "전시할 수 있는 물품 제한이 있을까요?",
+      "expected_category": "DISPLAY_USE",
+      "expected_faq_id": "H",
+      "type": "variant"
+    },
+    {
+      "question": "보세전시장에 장치된 물품의 사용 범위는 어떻게 되나요?",
+      "expected_category": "DISPLAY_USE",
+      "expected_faq_id": "I",
+      "type": "exact"
+    },
+    {
+      "question": "장치된 물품 어디까지 사용할 수 있나요?",
+      "expected_category": "DISPLAY_USE",
+      "expected_faq_id": "I",
+      "type": "variant"
+    },
+    {
+      "question": "보세전시장에서 시연(데모)을 할 수 있나요?",
+      "expected_category": "DISPLAY_USE",
+      "expected_faq_id": "J",
+      "type": "exact"
+    },
+    {
+      "question": "시범 데모 가능한가요?",
+      "expected_category": "DISPLAY_USE",
+      "expected_faq_id": "J",
+      "type": "variant"
+    },
+    {
+      "question": "전시 기간 중 물품 교체가 가능한가요?",
+      "expected_category": "DISPLAY_USE",
+      "expected_faq_id": "AM",
+      "type": "exact"
+    },
+    {
+      "question": "전시물을 중간에 바꿀 수 있나요?",
+      "expected_category": "DISPLAY_USE",
+      "expected_faq_id": "AM",
+      "type": "variant"
+    },
+    {
+      "question": "전시장 내 보관 시 주의사항은?",
+      "expected_category": "DISPLAY_USE",
+      "expected_faq_id": "AN",
+      "type": "exact"
+    },
+    {
+      "question": "전시장에서 촬영이나 홍보 활동이 가능한가요?",
+      "expected_category": "DISPLAY_USE",
+      "expected_faq_id": "AU",
+      "type": "exact"
+    },
+    {
+      "question": "보세전시장 반출입신고서는 어떤 서류인가요?",
+      "expected_category": "DOCUMENTS",
+      "expected_faq_id": "K",
+      "type": "exact"
+    },
+    {
+      "question": "반출입신고서 양식은 어떻게 되나요?",
+      "expected_category": "DOCUMENTS",
+      "expected_faq_id": "K",
+      "type": "variant"
+    },
+    {
+      "question": "보세전시장 특허 신청 시 어떤 서류가 필요한가요?",
+      "expected_category": "DOCUMENTS",
+      "expected_faq_id": "L",
+      "type": "exact"
+    },
+    {
+      "question": "특허 신청 구비서류 알려주세요.",
+      "expected_category": "DOCUMENTS",
+      "expected_faq_id": "L",
+      "type": "variant"
+    },
+    {
+      "question": "수입면허 신청에 필요한 서류는?",
+      "expected_category": "DOCUMENTS",
+      "expected_faq_id": "AO",
+      "type": "exact"
+    },
+    {
+      "question": "수입신고서 외에 필요한 서류 뭐가 있어요?",
+      "expected_category": "DOCUMENTS",
+      "expected_faq_id": "AO",
+      "type": "variant"
+    },
+    {
+      "question": "보세전시장 운영 종료 보고서는 어떻게 제출하나요?",
+      "expected_category": "DOCUMENTS",
+      "expected_faq_id": "AW",
+      "type": "exact"
+    },
+    {
+      "question": "운영 종료 결과 보고는 어떻게 하나요?",
+      "expected_category": "DOCUMENTS",
+      "expected_faq_id": "AW",
+      "type": "variant"
+    },
+    {
+      "question": "인보이스나 송장도 제출해야 하나요?",
+      "expected_category": "DOCUMENTS",
+      "expected_faq_id": "AO",
+      "type": "ambiguous"
+    },
+    {
+      "question": "특허 신청서 첨부서류 목록이 있나요?",
+      "expected_category": "DOCUMENTS",
+      "expected_faq_id": "L",
+      "type": "variant"
+    },
+    {
+      "question": "보세전시장에서 허가 없이 물품을 반출하면 어떻게 되나요?",
+      "expected_category": "PENALTIES",
+      "expected_faq_id": "N",
+      "type": "exact"
+    },
+    {
+      "question": "무허가 반출 시 처벌이 있나요?",
+      "expected_category": "PENALTIES",
+      "expected_faq_id": "N",
+      "type": "variant"
+    },
+    {
+      "question": "수입면허 없이 판매용 물품을 사용하면 제재가 있나요?",
+      "expected_category": "PENALTIES",
+      "expected_faq_id": "O",
+      "type": "exact"
+    },
+    {
+      "question": "면허 없이 판매하면 어떻게 제재 받나요?",
+      "expected_category": "PENALTIES",
+      "expected_faq_id": "O",
+      "type": "variant"
+    },
+    {
+      "question": "보세전시장 운영인이 의무를 위반하면 어떤 처분을 받나요?",
+      "expected_category": "PENALTIES",
+      "expected_faq_id": "P",
+      "type": "exact"
+    },
+    {
+      "question": "운영인 의무위반시 특허 취소되나요?",
+      "expected_category": "PENALTIES",
+      "expected_faq_id": "P",
+      "type": "variant"
+    },
+    {
+      "question": "과태료 금액은 어떻게 결정되나요?",
+      "expected_category": "PENALTIES",
+      "expected_faq_id": "AP",
+      "type": "exact"
+    },
+    {
+      "question": "과태료가 얼마나 부과되나요?",
+      "expected_category": "PENALTIES",
+      "expected_faq_id": "AP",
+      "type": "variant"
+    },
+    {
+      "question": "밀수출입죄가 적용될 수 있나요?",
+      "expected_category": "PENALTIES",
+      "expected_faq_id": "N",
+      "type": "edge"
+    },
+    {
+      "question": "업무 정지 처분 기준이 있나요?",
+      "expected_category": "PENALTIES",
+      "expected_faq_id": "P",
+      "type": "variant"
+    },
+    {
+      "question": "보세전시장 관련 문의는 어디에 하면 되나요?",
+      "expected_category": "CONTACT",
+      "expected_faq_id": "Q",
+      "type": "exact"
+    },
+    {
+      "question": "관세청 고객지원센터 전화번호가 어떻게 되나요?",
+      "expected_category": "CONTACT",
+      "expected_faq_id": "Q",
+      "type": "variant"
+    },
+    {
+      "question": "UNI-PASS 사용 중 오류가 나면 어디에 연락하나요?",
+      "expected_category": "CONTACT",
+      "expected_faq_id": "R",
+      "type": "exact"
+    },
+    {
+      "question": "유니패스 시스템 오류 신고는 어디로 하나요?",
+      "expected_category": "CONTACT",
+      "expected_faq_id": "R",
+      "type": "variant"
+    },
+    {
+      "question": "보세전시장 특허 관련 담당 부서가 어디인가요?",
+      "expected_category": "CONTACT",
+      "expected_faq_id": "S",
+      "type": "exact"
+    },
+    {
+      "question": "보세산업과는 무엇을 담당하나요?",
+      "expected_category": "CONTACT",
+      "expected_faq_id": "S",
+      "type": "variant"
+    },
+    {
+      "question": "관세 불복 절차는 어떻게 되나요?",
+      "expected_category": "CONTACT",
+      "expected_faq_id": "AQ",
+      "type": "exact"
+    },
+    {
+      "question": "이의신청은 어떻게 제기하나요?",
+      "expected_category": "CONTACT",
+      "expected_faq_id": "AQ",
+      "type": "variant"
+    },
+    {
+      "question": "관세사에게 대행을 맡길 수 있나요?",
+      "expected_category": "CONTACT",
+      "expected_faq_id": "AX",
+      "type": "exact"
+    },
+    {
+      "question": "관세사 위임이 가능한가요?",
+      "expected_category": "CONTACT",
+      "expected_faq_id": "AX",
+      "type": "variant"
+    },
+    {
+      "question": "보세전시장이 뭐에요?",
+      "expected_category": "GENERAL",
+      "expected_faq_id": "A",
+      "type": "colloquial"
+    },
+    {
+      "question": "보세전시장이란 무엇인가요?",
+      "expected_category": "GENERAL",
+      "expected_faq_id": "A",
+      "type": "colloquial"
+    },
+    {
+      "question": "보세전시장 누구나 쓸 수 있나?",
+      "expected_category": "GENERAL",
+      "expected_faq_id": "U",
+      "type": "colloquial"
+    },
+    {
+      "question": "견본품 반출하려면 뭐가 필요해요?",
+      "expected_category": "SAMPLE",
+      "expected_faq_id": "M",
+      "type": "colloquial"
+    },
+    {
+      "question": "견본품 관세 내야 합니까?",
+      "expected_category": "SAMPLE",
+      "expected_faq_id": "Z",
+      "type": "colloquial"
+    },
+    {
+      "question": "견본품 관세?",
+      "expected_category": "SAMPLE",
+      "expected_faq_id": "Z",
+      "type": "short"
+    },
+    {
+      "question": "샘플 수량 제한이 있어요?",
+      "expected_category": "SAMPLE",
+      "expected_faq_id": "AF",
+      "type": "colloquial"
+    },
+    {
+      "question": "시식 행사 전에 신고해야 하나요?",
+      "expected_category": "FOOD_TASTING",
+      "expected_faq_id": "AI",
+      "type": "colloquial"
+    },
+    {
+      "question": "시식 행사 남은 식품",
+      "expected_category": "FOOD_TASTING",
+      "expected_faq_id": "Y",
+      "type": "short"
+    },
+    {
+      "question": "특허 취소 기준이 뭔가요?",
+      "expected_category": "LICENSE",
+      "expected_faq_id": "AK",
+      "type": "colloquial"
+    },
+    {
+      "question": "보세전시장 특허 취소 사유",
+      "expected_category": "LICENSE",
+      "expected_faq_id": "AK",
+      "type": "short"
+    },
+    {
+      "question": "특허 몇 년이나 해요?",
+      "expected_category": "LICENSE",
+      "expected_faq_id": "F",
+      "type": "colloquial"
+    },
+    {
+      "question": "보세전시장 특허 어떻게 받죠?",
+      "expected_category": "LICENSE",
+      "expected_faq_id": "G",
+      "type": "colloquial"
+    },
+    {
+      "question": "판매 계약 먼저 해도 괜찮아요?",
+      "expected_category": "SALES",
+      "expected_faq_id": "X",
+      "type": "colloquial"
+    },
+    {
+      "question": "수입면허 없이 팔면?",
+      "expected_category": "PENALTIES",
+      "expected_faq_id": "O",
+      "type": "colloquial"
+    },
+    {
+      "question": "밀수출입죄",
+      "expected_category": "PENALTIES",
+      "expected_faq_id": "N",
+      "type": "short"
+    },
+    {
+      "question": "과태료 얼마?",
+      "expected_category": "PENALTIES",
+      "expected_faq_id": "AP",
+      "type": "short"
+    },
+    {
+      "question": "보세전시장 간 이동 가능한가요?",
+      "expected_category": "IMPORT_EXPORT",
+      "expected_faq_id": "AS",
+      "type": "colloquial"
+    },
+    {
+      "question": "전시 끝난 물품 어떻게 해요?",
+      "expected_category": "IMPORT_EXPORT",
+      "expected_faq_id": "W",
+      "type": "colloquial"
+    },
+    {
+      "question": "반출신고는 어떻게?",
+      "expected_category": "IMPORT_EXPORT",
+      "expected_faq_id": "B",
+      "type": "short"
+    },
+    {
+      "question": "반입 물품 검사 어떻게?",
+      "expected_category": "IMPORT_EXPORT",
+      "expected_faq_id": "AB",
+      "type": "colloquial"
+    },
+    {
+      "question": "가액 신고 어떻게?",
+      "expected_category": "IMPORT_EXPORT",
+      "expected_faq_id": "AL",
+      "type": "short"
+    },
+    {
+      "question": "uni pass 오류나면 어디로?",
+      "expected_category": "CONTACT",
+      "expected_faq_id": "R",
+      "type": "colloquial"
+    },
+    {
+      "question": "불복 어떻게?",
+      "expected_category": "CONTACT",
+      "expected_faq_id": "AQ",
+      "type": "short"
+    },
+    {
+      "question": "관세사 위임 되나요?",
+      "expected_category": "CONTACT",
+      "expected_faq_id": "AX",
+      "type": "colloquial"
+    },
+    {
+      "question": "전시 기간 중 전시품 바꿀 수 있어요?",
+      "expected_category": "DISPLAY_USE",
+      "expected_faq_id": "AM",
+      "type": "colloquial"
+    },
+    {
+      "question": "보세전시장에서 촬영 가능?",
+      "expected_category": "DISPLAY_USE",
+      "expected_faq_id": "AU",
+      "type": "colloquial"
+    },
+    {
+      "question": "시식용 식품 한글 라벨",
+      "expected_category": "FOOD_TASTING",
+      "expected_faq_id": "AV",
+      "type": "short"
+    },
+    {
+      "question": "운영인 자격 요건",
+      "expected_category": "GENERAL",
+      "expected_faq_id": "AR",
+      "type": "short"
+    },
+    {
+      "question": "보관 주의사항 뭐 있어요?",
+      "expected_category": "DISPLAY_USE",
+      "expected_faq_id": "AN",
+      "type": "colloquial"
+    },
+    {
+      "question": "운영 종료 보고서 제출",
+      "expected_category": "DOCUMENTS",
+      "expected_faq_id": "AW",
+      "type": "short"
+    },
+    {
+      "question": "보세창고는 뭐에요?",
+      "expected_category": "GENERAL",
+      "expected_faq_id": "T",
+      "type": "colloquial"
+    },
+    {
+      "question": "수입면허 신청 방법",
+      "expected_category": "SALES",
+      "expected_faq_id": "AE",
+      "type": "short"
+    }
   ]
 }
