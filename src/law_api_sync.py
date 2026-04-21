@@ -306,24 +306,32 @@ class LawSyncManager:
             "changed_refs": changed_refs,
         }
 
-    def sync_and_propagate(self, faq_path=None, legal_ref_path=None):
-        """전체 파이프라인: API → legal_references.json → faq.json.
+    def sync_and_propagate(self, faq_path=None, legal_ref_path=None, notifier=None):
+        """전체 파이프라인: API → legal_references.json → faq.json → 알림.
 
         1) 모니터링 대상 법령의 변경을 확인한다 (check_all).
         2) 변경이 감지되면 legal_references.json의 요약을 갱신한다.
         3) 갱신된 조문이 포함된 FAQ의 last_synced와 law_snapshot을 업데이트한다.
+        4) 변경된 조문별로 FAQUpdateNotifier 알림을 생성한다(옵셔널).
+
+        Args:
+            faq_path: 대체 FAQ 경로 (테스트용)
+            legal_ref_path: 대체 legal_references 경로 (테스트용)
+            notifier: 주입된 FAQUpdateNotifier. None이면 알림 단계 스킵.
 
         Returns:
             {
-                "check": {...},      # check_all 결과
-                "legal_refs": {...}, # update_legal_references 결과
-                "faq": {...},        # FAQAutoUpdater.propagate 결과
+                "check": {...},           # check_all 결과
+                "legal_refs": {...},      # update_legal_references 결과
+                "faq": {...},             # FAQAutoUpdater.propagate 결과
+                "notifications": int,     # 생성된 알림 수 (notifier 주입 시)
             }
         """
         check_result = self.check_all()
         legal_result = self.update_legal_references()
 
         faq_result = {"updated_items": 0, "changed_items": []}
+        notifications_created = 0
         if legal_result.get("changed_refs"):
             updater = FAQAutoUpdater(
                 faq_path=faq_path,
@@ -332,10 +340,22 @@ class LawSyncManager:
             )
             faq_result = updater.propagate(legal_result["changed_refs"])
 
+            if notifier is not None:
+                for ref in legal_result["changed_refs"]:
+                    try:
+                        notifs = notifier.create_notifications(
+                            ref["law_name"], ref["article"]
+                        )
+                        notifications_created += len(notifs)
+                    except Exception:
+                        # 알림 실패가 전체 파이프라인을 중단시키지 않도록 방어
+                        pass
+
         return {
             "check": check_result,
             "legal_refs": legal_result,
             "faq": faq_result,
+            "notifications": notifications_created,
         }
 
     def get_monitored_laws(self):

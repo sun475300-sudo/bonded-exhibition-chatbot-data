@@ -234,6 +234,57 @@ class TestSyncAndPropagate:
             assert "legal_refs" in result
             assert "faq" in result
             assert result["faq"]["updated_items"] == 0
+            assert result["notifications"] == 0
+        finally:
+            mod.LEGAL_REF_PATH = original_legal
+
+    def test_sync_and_propagate_with_notifier(self, sync_manager, tmp_path, monkeypatch):
+        """변경 감지 시 FAQUpdateNotifier 알림이 생성된다."""
+        faq_file = tmp_path / "faq.json"
+        faq_file.write_text(json.dumps({
+            "items": [{
+                "id": "TEST1",
+                "category": "GENERAL",
+                "question": "q",
+                "answer": "a",
+                "legal_basis": ["관세법 제190조(보세전시장)"],
+                "keywords": [],
+            }],
+        }, ensure_ascii=False), encoding="utf-8")
+        ref_file = tmp_path / "legal_ref.json"
+        ref_file.write_text(json.dumps({
+            "references": [{
+                "law_name": "관세법",
+                "article": "제190조",
+                "summary": "원래 요약",
+            }],
+        }, ensure_ascii=False), encoding="utf-8")
+
+        # check_all은 네트워크 실패를 시뮬레이션, 대신 캐시에 변경을 주입
+        monkeypatch.setattr(sync_manager.client, "get_law_text", lambda **kw: None)
+        sync_manager._record_check("관세법", "제190조", "새 본문입니다. 길게 나열된 실제 조문 내용의 요약.")
+
+        from src.law_updater import FAQUpdateNotifier
+        notifier = FAQUpdateNotifier(
+            faq_path=str(faq_file),
+            db_path=str(tmp_path / "notif.db"),
+        )
+
+        import src.law_api_sync as mod
+        original_legal = mod.LEGAL_REF_PATH
+        mod.LEGAL_REF_PATH = str(ref_file)
+        try:
+            result = sync_manager.sync_and_propagate(
+                faq_path=str(faq_file),
+                legal_ref_path=str(ref_file),
+                notifier=notifier,
+            )
+            assert result["legal_refs"]["updated"] == 1
+            assert result["faq"]["updated_items"] == 1
+            assert result["notifications"] == 1
+            pending = notifier.get_pending_notifications()
+            assert len(pending) == 1
+            assert pending[0]["faq_id"] == "TEST1"
         finally:
             mod.LEGAL_REF_PATH = original_legal
 
