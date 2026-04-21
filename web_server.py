@@ -1804,9 +1804,22 @@ def admin_law_updates():
 
 @app.route("/api/admin/law-updates/check", methods=["POST"])
 def admin_law_updates_check():
-    """수동 법령 업데이트 확인을 트리거한다."""
+    """수동 법령 업데이트 확인을 트리거한다.
+
+    변경이 감지되어 FAQ 에 영향이 있는 경우, 챗봇의 legal_refs 도
+    함께 리로드하여 답변이 즉시 최신 상태를 반영하도록 한다.
+    """
     try:
         result = law_update_scheduler.check_for_updates()
+        if result.get("changes_detected", 0) > 0:
+            try:
+                reload_result = chatbot.reload_legal_references()
+                global knowledge_graph
+                knowledge_graph = chatbot.knowledge_graph
+                result["chatbot_reload"] = reload_result
+            except Exception as e:
+                logger.error(f"챗봇 법령 리로드 실패: {e}")
+                result["chatbot_reload"] = {"error": str(e)}
         return jsonify(result)
     except Exception as e:
         logger.error(f"법령 업데이트 확인 실패: {e}")
