@@ -51,6 +51,19 @@ CLASSIFIER_CACHE_MAX_SIZE = 100
 MIN_CONCLUSION_LENGTH = 3
 
 
+def _keyword_weight(kw: str) -> int:
+    """키워드 매칭 가중치를 계산한다.
+
+    공백을 제거한 한글 문자 길이를 기준으로 하여, 더 구체적인 다어절
+    키워드(예: "견본품 수량", "한글 표시 라벨")가 단일 일반 키워드보다
+    높은 점수를 받도록 한다. 최소 가중치는 1이다.
+    """
+    if not kw:
+        return 1
+    stripped = kw.replace(" ", "").replace("\t", "")
+    return max(1, len(stripped))
+
+
 class BondedExhibitionChatbot:
     """보세전시장 민원응대 챗봇 클래스."""
 
@@ -107,6 +120,21 @@ class BondedExhibitionChatbot:
             self.knowledge_graph = KnowledgeGraph.build_from_faq(self.faq_items)
         except Exception:
             pass
+
+    # 카테고리 코드 alias (FAQ 저장소와 golden/classifier 라벨 간 호환)
+    _CATEGORY_ALIASES = {
+        "DISPLAY_USE": "EXHIBITION",
+        "EXHIBITION": "DISPLAY_USE",
+    }
+
+    @classmethod
+    def _category_matches(cls, item_category: str, query_category: str) -> bool:
+        """FAQ 항목의 카테고리와 질문 카테고리가 동일하거나 별칭 관계인지 확인한다."""
+        if not item_category or not query_category:
+            return False
+        if item_category == query_category:
+            return True
+        return cls._CATEGORY_ALIASES.get(item_category) == query_category
 
     @staticmethod
     def _normalize_faq_items(items: list[dict]) -> list[dict]:
@@ -169,24 +197,40 @@ class BondedExhibitionChatbot:
         best_score = 0
         best_keyword_hits = 0
 
-        # 1단계: 키워드 매칭
+        # 1단계: 키워드 매칭 (길이 기반 가중치 적용)
+        best_longest_kw = 0
         for item in self.faq_items:
             score = 0
             keyword_hits = 0
+            longest_kw = 0
 
-            if item.get("category") == category:
+            if self._category_matches(item.get("category"), category):
                 score += CATEGORY_BONUS
 
             keywords = item.get("keywords", [])
             for kw in keywords:
-                if kw.lower() in query_lower:
-                    score += 1
+                kw_lower = kw.lower().strip() if kw else ""
+                if kw_lower and kw_lower in query_lower:
+                    weight = _keyword_weight(kw_lower)
+                    score += weight
                     keyword_hits += 1
+                    if weight > longest_kw:
+                        longest_kw = weight
 
-            if score > best_score or (score == best_score and keyword_hits > best_keyword_hits):
+            better = False
+            if score > best_score:
+                better = True
+            elif score == best_score:
+                if keyword_hits > best_keyword_hits:
+                    better = True
+                elif keyword_hits == best_keyword_hits and longest_kw > best_longest_kw:
+                    better = True
+
+            if better:
                 best_score = score
                 best_match = item
                 best_keyword_hits = keyword_hits
+                best_longest_kw = longest_kw
 
         if best_score >= KEYWORD_SCORE_THRESHOLD and best_keyword_hits >= MIN_KEYWORD_HITS:
             return best_match

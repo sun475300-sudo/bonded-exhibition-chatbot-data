@@ -166,20 +166,41 @@ class IntentClassifier:
         self._load_intents()
 
     def _load_intents(self):
-        """intents.json에서 의도 정의를 로드한다."""
+        """intents.json에서 의도 정의를 로드한다.
+
+        두 가지 포맷을 지원한다:
+        - 신규: {"intents": [ { "id": ..., "example_queries": [...] } ]}
+        - 간단: [ { "intent_id": ..., "intent_name_ko": ..., "description": ... } ]
+        """
         try:
             data = load_json("data/intents.json")
-            intent_list = data.get("intents", [])
+            if isinstance(data, list):
+                intent_list = data
+            elif isinstance(data, dict):
+                intent_list = data.get("intents", [])
+            else:
+                intent_list = []
 
             for intent in intent_list:
-                intent_id = intent.get("id")
+                intent_id = intent.get("id") or intent.get("intent_id")
+                if not intent_id:
+                    continue
                 self.intents[intent_id] = intent
 
-                # 예시 쿼리로부터 키워드 추출
+                # 예시 쿼리 또는 이름/설명으로부터 키워드 추출
                 example_queries = intent.get("example_queries", [])
+                if not example_queries:
+                    fallback_text = " ".join(
+                        s for s in (
+                            intent.get("intent_name_ko"),
+                            intent.get("description"),
+                        ) if s
+                    )
+                    if fallback_text:
+                        example_queries = [fallback_text]
+
                 keywords = set()
                 for query in example_queries:
-                    # 간단한 토큰화
                     tokens = normalize_query(query).split()
                     keywords.update(tokens)
 
