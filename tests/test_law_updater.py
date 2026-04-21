@@ -267,6 +267,107 @@ class TestLawUpdateScheduler:
         assert scheduler._timer is None
 
 
+class TestLawUpdateSchedulerFullSync:
+    """sync_manager가 주입된 스케줄러의 풀 사이클 동작 검증."""
+
+    def test_run_full_sync_triggers_on_propagate(self, tracker, notifier):
+        """FAQ 전파가 발생하면 on_propagate 콜백이 호출된다."""
+        class FakeSyncManager:
+            def sync_and_propagate(self):
+                return {
+                    "check": {
+                        "checked_at": "2026-04-21T00:00:00",
+                        "total_checked": 1,
+                        "changes_detected": 1,
+                        "errors": 0,
+                        "details": [
+                            {
+                                "law_name": "관세법",
+                                "article": "제190조",
+                                "status": "changed",
+                                "content_preview": "새 본문",
+                            }
+                        ],
+                    },
+                    "legal_references_update": {"updated": 1, "total": 1},
+                    "faq_propagation": {
+                        "propagated": 1, "total_faq": 3, "items": ["FAQ_A"],
+                    },
+                }
+
+        callback_calls = []
+        sched = LawUpdateScheduler(
+            version_tracker=tracker,
+            notifier=notifier,
+            sync_manager=FakeSyncManager(),
+            on_propagate=lambda: callback_calls.append("reload"),
+        )
+        try:
+            result = sched.run_full_sync()
+            assert result["changes_detected"] == 1
+            assert result["propagated"] == 1
+            assert "FAQ_A" in result["propagated_items"]
+            assert callback_calls == ["reload"]
+            # 이력에도 기록됨
+            assert len(sched.get_update_history()) == 1
+        finally:
+            sched.stop()
+
+    def test_run_full_sync_skips_callback_when_no_propagation(self, tracker, notifier):
+        """전파 항목이 없으면 on_propagate 콜백은 호출되지 않는다."""
+        class FakeSyncManager:
+            def sync_and_propagate(self):
+                return {
+                    "check": {"changes_detected": 0, "details": []},
+                    "legal_references_update": {"updated": 0, "total": 0},
+                    "faq_propagation": {"propagated": 0, "total_faq": 3, "items": []},
+                }
+
+        callback_calls = []
+        sched = LawUpdateScheduler(
+            version_tracker=tracker,
+            notifier=notifier,
+            sync_manager=FakeSyncManager(),
+            on_propagate=lambda: callback_calls.append("reload"),
+        )
+        try:
+            result = sched.run_full_sync()
+            assert result["propagated"] == 0
+            assert callback_calls == []
+        finally:
+            sched.stop()
+
+    def test_run_full_sync_raises_without_sync_manager(self, scheduler):
+        """sync_manager가 없는 스케줄러에서 run_full_sync를 호출하면 오류가 발생한다."""
+        with pytest.raises(RuntimeError):
+            scheduler.run_full_sync()
+
+    def test_run_full_sync_swallows_callback_errors(self, tracker, notifier):
+        """on_propagate 콜백에서 오류가 나도 sync 결과는 정상 반환된다."""
+        class FakeSyncManager:
+            def sync_and_propagate(self):
+                return {
+                    "check": {"changes_detected": 1, "details": []},
+                    "legal_references_update": {"updated": 0, "total": 0},
+                    "faq_propagation": {"propagated": 2, "total_faq": 5, "items": ["A", "B"]},
+                }
+
+        def _broken_callback():
+            raise ValueError("boom")
+
+        sched = LawUpdateScheduler(
+            version_tracker=tracker,
+            notifier=notifier,
+            sync_manager=FakeSyncManager(),
+            on_propagate=_broken_callback,
+        )
+        try:
+            result = sched.run_full_sync()
+            assert result["propagated"] == 2
+        finally:
+            sched.stop()
+
+
 # ---------------------------------------------------------------------------
 # API 엔드포인트 테스트
 # ---------------------------------------------------------------------------

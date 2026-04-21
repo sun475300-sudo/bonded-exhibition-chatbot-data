@@ -4,6 +4,20 @@
 
 형식: [Keep a Changelog](https://keepachangelog.com/ko/1.1.0/)
 
+## [14.2.0] - 2026-04-21
+
+### Added
+- `LawUpdateScheduler`를 `LawSyncManager`와 연결하여 예약된 확인 주기마다
+  국가법령정보센터 API 원문 → legal_references → FAQ 전파까지 풀 사이클로 실행.
+  - 새 파라미터: `sync_manager`, `on_propagate` 콜백
+  - 새 메서드: `run_full_sync` (sync_manager 주입 시 사용)
+  - 환경변수 `LAW_SYNC_AUTOSTART=1`로 서버 기동 시 자동 시작,
+    `LAW_SYNC_INTERVAL_HOURS`로 주기 조정 (기본 24시간)
+  - 전파가 발생하면 챗봇 인스턴스의 `reload_faq`를 자동 호출하여
+    재시작 없이 최신 법령 상태를 반영
+- `tests/test_law_updater.py`: `TestLawUpdateSchedulerFullSync` 4건 추가
+  (콜백 호출 / 미호출 / sync_manager 누락 / 콜백 예외 스왈로 검증)
+
 ## [14.1.0] - 2026-04-21
 
 ### Added

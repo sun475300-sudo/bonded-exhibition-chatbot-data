@@ -156,7 +156,6 @@ jwt_auth = JWTAuth()
 # 법령 업데이트 모듈 초기화
 law_version_tracker = LawVersionTracker()
 faq_update_notifier = FAQUpdateNotifier()
-law_update_scheduler = LawUpdateScheduler(law_version_tracker, faq_update_notifier)
 
 # 백업 관리자 초기화
 backup_manager = BackupManager()
@@ -1834,6 +1833,24 @@ def admin_law_updates_acknowledge():
 # --- 국가법령정보센터 API 동기화 ---
 from src.law_api_sync import LawSyncManager
 law_sync_manager = LawSyncManager()
+
+# 스케줄러를 sync_manager와 챗봇 핫 리로드에 연결
+law_update_scheduler = LawUpdateScheduler(
+    law_version_tracker,
+    faq_update_notifier,
+    sync_manager=law_sync_manager,
+    on_propagate=lambda: chatbot.reload_faq(),
+)
+
+# LAW_SYNC_AUTOSTART=1 이면 서버 기동 시 자동 스케줄 시작
+# LAW_SYNC_INTERVAL_HOURS로 주기 조정 (기본 24시간)
+if os.environ.get("LAW_SYNC_AUTOSTART") == "1":
+    try:
+        _interval = float(os.environ.get("LAW_SYNC_INTERVAL_HOURS", "24"))
+        law_update_scheduler.schedule_check(interval_hours=_interval)
+        logger.info(f"법령 동기화 스케줄러 시작 (주기: {_interval}시간)")
+    except Exception as _e:
+        logger.warning(f"법령 동기화 스케줄러 시작 실패: {_e}")
 
 
 @app.route("/api/admin/law-sync/check", methods=["POST"])
