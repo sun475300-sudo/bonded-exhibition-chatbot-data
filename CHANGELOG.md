@@ -4,6 +4,25 @@
 
 형식: [Keep a Changelog](https://keepachangelog.com/ko/1.1.0/)
 
+## [14.1.0] - 2026-04-21
+
+### Added
+- 국가법령정보센터 API 변경 감지 시 FAQ 답변까지 자동 전파되도록 확장
+  - `LawSyncManager.propagate_to_faq`: 변경된 법령을 인용한 FAQ 항목에 `law_update_pending`·`last_law_sync` 플래그 기록
+  - `LawSyncManager.sync_and_propagate`: 법령 확인 → legal_references.json 갱신 → FAQ 전파까지 한 번에 수행
+  - `LawSyncManager.clear_faq_pending_flags`: 관리자가 수동 검토한 FAQ의 재검토 플래그 해제
+  - `LawSyncManager.get_recent_changes`: 변경 이력 중 실제 변경분만 필터링
+- 새 엔드포인트: `/api/admin/law-sync/propagate`, `/api/admin/law-sync/faq-pending`, `/api/admin/law-sync/faq-pending/clear`
+- `BondedExhibitionChatbot.reload_faq`: 법령 전파 후 챗봇 재시작 없이 FAQ·법령 근거 핫 리로드
+- `build_response`에 `law_update_pending`·`last_law_sync` 지원: 최근 법령 변경이 감지된 FAQ 답변에는 국가법령정보센터 재확인 안내 문구 추가
+- 모니터링 대상에 관세법 제119조(심사와 심판) 추가
+
+### Fixed
+- FAQ 항목 **AQ(관세 불복 절차)**에서 잘못된 법전 편(編) 인용 수정
+  - 기존: "관세법 제7편(불복절차)" → 수정: "관세법 제5장(납세자의 권리 및 불복절차) 제2절(심사와 심판, 제119조부터 제132조)"
+  - `legal_basis`에 `관세법 제119조` 명시
+  - 심사청구(관세청장)·심판청구(조세심판원장)·이의신청(처분 세관장) 주체 구분을 문구에 반영
+
 ## [14.0.0] - 2026-04-02
 
 ### Added

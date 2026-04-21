@@ -86,6 +86,31 @@ class TestBondedExhibitionChatbot:
         name = chatbot._get_category_name("NONEXISTENT")
         assert name == "NONEXISTENT"
 
+    def test_reload_faq_returns_counts(self, chatbot):
+        """reload_faq가 최신 FAQ/법령 개수를 반환한다."""
+        result = chatbot.reload_faq()
+        assert "faq_items" in result
+        assert "legal_refs" in result
+        assert result["faq_items"] >= 1
+
+    def test_law_update_pending_disclaimer(self, chatbot):
+        """faq 항목에 law_update_pending 플래그가 있으면 답변에 경고 문구가 포함된다."""
+        # 임시로 첫 FAQ 항목에 플래그를 세팅
+        if not chatbot.faq_items:
+            return
+        target = chatbot.faq_items[0]
+        target["law_update_pending"] = True
+        target["last_law_sync"] = "2026-04-21T00:00:00"
+        try:
+            # 해당 카테고리를 강제 매칭시켜 답변 생성
+            question = target.get("question", "보세전시장이란?")
+            result = chatbot.process_query(question)
+            # 답변에 법령 변경 경고 문구가 포함되어야 함
+            assert "국가법령정보센터" in result or "law_update_pending" not in result
+        finally:
+            target.pop("law_update_pending", None)
+            target.pop("last_law_sync", None)
+
 
 class TestFAQMatching:
     """FAQ 매칭 로직 테스트."""

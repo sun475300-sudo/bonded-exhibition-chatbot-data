@@ -1879,6 +1879,60 @@ def admin_law_sync_monitored():
     return jsonify({"laws": law_sync_manager.get_monitored_laws()})
 
 
+@app.route("/api/admin/law-sync/propagate", methods=["POST"])
+@jwt_auth.require_auth()
+def admin_law_sync_propagate():
+    """법령 변경 확인 → legal_references.json → faq.json 전파를 한 번에 실행한다.
+
+    전파가 완료되면 chatbot 인스턴스의 FAQ 데이터도 재로딩하여 사용자가
+    다음 질문을 할 때 최신 법령 반영 상태가 즉시 적용되도록 한다.
+    """
+    try:
+        result = law_sync_manager.sync_and_propagate()
+        # 전파가 있었으면 챗봇 FAQ 핫 리로드
+        if result.get("faq_propagation", {}).get("propagated", 0) > 0:
+            try:
+                chatbot.reload_faq()
+            except Exception as reload_err:
+                logger.warning(f"챗봇 FAQ 재로딩 실패: {reload_err}")
+        return jsonify(result)
+    except Exception as e:
+        logger.error(f"법령 동기화 전파 실패: {e}")
+        return jsonify({"error": str(e)}), 500
+
+
+@app.route("/api/admin/law-sync/faq-pending", methods=["GET"])
+@jwt_auth.require_auth()
+def admin_law_sync_faq_pending():
+    """법령 변경으로 재검토 대기 중인 FAQ 항목 목록을 반환한다."""
+    faq_data = load_json("data/faq.json")
+    pending = [
+        {
+            "id": item.get("id"),
+            "question": item.get("question"),
+            "legal_basis": item.get("legal_basis", []),
+            "last_law_sync": item.get("last_law_sync"),
+        }
+        for item in faq_data.get("items", [])
+        if item.get("law_update_pending")
+    ]
+    return jsonify({"pending": pending, "count": len(pending)})
+
+
+@app.route("/api/admin/law-sync/faq-pending/clear", methods=["POST"])
+@jwt_auth.require_auth()
+def admin_law_sync_faq_pending_clear():
+    """수동 검토 완료된 FAQ의 law_update_pending 플래그를 해제한다."""
+    data = request.get_json(silent=True) or {}
+    faq_ids = data.get("faq_ids")
+    result = law_sync_manager.clear_faq_pending_flags(faq_ids=faq_ids)
+    try:
+        chatbot.reload_faq()
+    except Exception as reload_err:
+        logger.warning(f"챗봇 FAQ 재로딩 실패: {reload_err}")
+    return jsonify(result)
+
+
 @app.route("/api/admin/backup", methods=["POST"])
 @jwt_auth.require_auth()
 def admin_backup_create():
