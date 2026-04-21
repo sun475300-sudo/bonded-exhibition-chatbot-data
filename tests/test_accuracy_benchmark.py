@@ -138,7 +138,9 @@ class TestBenchmarkRuns:
         stub = _StubChatbot({}, default=("GENERAL", "A"))
         bench = _fresh_benchmark(tmp_path, stub)
         metrics = bench.run_benchmark(GOLDEN_PATH)
-        assert metrics["total"] == 100
+        # golden_testset may grow as new edge cases are added; require the
+        # original 10 categories × 10 items baseline (100) as a floor.
+        assert metrics["total"] >= 100
         assert len(metrics["by_category"]) == 10
 
 
@@ -330,7 +332,9 @@ class TestAdminApi:
         assert "metrics" in data
         assert "comparison" in data
         metrics = data["metrics"]
-        assert metrics["total"] == 100
+        # golden_testset grows as colloquial/edge cases are added;
+        # keep 100 as the minimum baseline.
+        assert metrics["total"] >= 100
         assert "category_accuracy" in metrics
 
     def test_run_endpoint_missing_file(self, client):
