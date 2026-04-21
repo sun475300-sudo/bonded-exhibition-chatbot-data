@@ -1804,9 +1804,22 @@ def admin_law_updates():
 
 @app.route("/api/admin/law-updates/check", methods=["POST"])
 def admin_law_updates_check():
-    """수동 법령 업데이트 확인을 트리거한다."""
+    """수동 법령 업데이트 확인을 트리거한다.
+
+    변경이 감지되어 FAQ 에 영향이 있는 경우, 챗봇의 legal_refs 도
+    함께 리로드하여 답변이 즉시 최신 상태를 반영하도록 한다.
+    """
     try:
         result = law_update_scheduler.check_for_updates()
+        if result.get("changes_detected", 0) > 0:
+            try:
+                reload_result = chatbot.reload_legal_references()
+                global knowledge_graph
+                knowledge_graph = chatbot.knowledge_graph
+                result["chatbot_reload"] = reload_result
+            except Exception as e:
+                logger.error(f"챗봇 법령 리로드 실패: {e}")
+                result["chatbot_reload"] = {"error": str(e)}
         return jsonify(result)
     except Exception as e:
         logger.error(f"법령 업데이트 확인 실패: {e}")
@@ -1851,16 +1864,47 @@ def admin_law_sync_check():
 @app.route("/api/admin/law-sync/sync", methods=["POST"])
 @jwt_auth.require_auth()
 def admin_law_sync_apply():
-    """법령 변경을 확인하고 legal_references.json을 자동 업데이트한다."""
+    """법령 변경을 확인하고 legal_references.json을 자동 업데이트한다.
+
+    업데이트 후 챗봇의 legal_refs/지식그래프를 즉시 리로드하여
+    보세봇 답변이 최신 법령 내용으로 자동 갱신되도록 한다.
+    """
     try:
         check_result = law_sync_manager.check_all()
         update_result = law_sync_manager.update_legal_references()
+
+        reload_result = {}
+        if update_result.get("updated", 0) > 0:
+            try:
+                reload_result = chatbot.reload_legal_references()
+                # 지식 그래프가 재구성되면 공유 참조도 갱신
+                global knowledge_graph
+                knowledge_graph = chatbot.knowledge_graph
+            except Exception as e:
+                logger.error(f"챗봇 법령 리로드 실패: {e}")
+                reload_result = {"error": str(e)}
+
         return jsonify({
             "check": check_result,
             "update": update_result,
+            "reload": reload_result,
         })
     except Exception as e:
         logger.error(f"법령 동기화 실패: {e}")
+        return jsonify({"error": str(e)}), 500
+
+
+@app.route("/api/admin/law-sync/reload", methods=["POST"])
+@jwt_auth.require_auth()
+def admin_law_sync_reload():
+    """legal_references.json 을 다시 읽어 챗봇에 적용한다 (수동 리로드)."""
+    try:
+        result = chatbot.reload_legal_references()
+        global knowledge_graph
+        knowledge_graph = chatbot.knowledge_graph
+        return jsonify(result)
+    except Exception as e:
+        logger.error(f"법령 수동 리로드 실패: {e}")
         return jsonify({"error": str(e)}), 500
 
 

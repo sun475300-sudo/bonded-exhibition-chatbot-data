@@ -15,6 +15,7 @@
 """
 
 import logging
+import os
 from collections import OrderedDict
 from src.classifier import classify_query, classify_intent, get_intent_classifier
 from src.clarification import ClarificationEngine
@@ -51,17 +52,30 @@ CLASSIFIER_CACHE_MAX_SIZE = 100
 MIN_CONCLUSION_LENGTH = 3
 
 
+def _keyword_weight(kw: str) -> int:
+    """키워드 매칭 가중치를 계산한다.
+
+    공백을 제거한 한글 문자 길이를 기준으로 하여, 더 구체적인 다어절
+    키워드(예: "견본품 수량", "한글 표시 라벨")가 단일 일반 키워드보다
+    높은 점수를 받도록 한다. 최소 가중치는 1이다.
+    """
+    if not kw:
+        return 1
+    stripped = kw.replace(" ", "").replace("\t", "")
+    return max(1, len(stripped))
+
+
 class BondedExhibitionChatbot:
     """보세전시장 민원응대 챗봇 클래스."""
+
+    LEGAL_REFS_PATH = "data/legal_references.json"
 
     def __init__(self):
         self.config = load_json("config/chatbot_config.json")
         self.faq_data = load_json("data/faq.json")
-        try:
-            self.legal_refs = load_json("data/legal_references.json").get("references", [])
-        except Exception as e:
-            logger.warning(f"Failed to load legal_references.json: {e}")
-            self.legal_refs = []
+        self.legal_refs = []
+        self._legal_refs_mtime: float = 0.0
+        self._load_legal_refs()
         self.system_prompt = load_text("config/system_prompt.txt")
         self.faq_items = self._normalize_faq_items(self.faq_data.get("items", []))
         self.tfidf_matcher = TFIDFMatcher(self.faq_items)
@@ -100,13 +114,116 @@ class BondedExhibitionChatbot:
         self.pii_redactor = PIIRedactor(enabled=True)
         self.prompt_defender = PromptDefender(enabled=True)
 
-        # 지식 그래프 (선택적)
+        # 지식 그래프 (선택적) — legal_refs 를 함께 전달하여 법령 요약이
+        # 답변의 "전문가 법령 가이드" 섹션에 노출되도록 한다.
         self.knowledge_graph = None
+        self._build_knowledge_graph()
+
+    # 카테고리 코드 alias (FAQ 저장소와 golden/classifier 라벨 간 호환)
+    _CATEGORY_ALIASES = {
+        "DISPLAY_USE": "EXHIBITION",
+        "EXHIBITION": "DISPLAY_USE",
+    }
+
+    # ------------------------------------------------------------------
+    # 법령 참조(legal_references.json) 로드 및 라이브 리로드
+    # ------------------------------------------------------------------
+
+    def _legal_refs_full_path(self) -> str:
+        """legal_references.json 의 절대 경로."""
+        if os.path.isabs(self.LEGAL_REFS_PATH):
+            return self.LEGAL_REFS_PATH
+        base = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+        return os.path.join(base, self.LEGAL_REFS_PATH)
+
+    def _load_legal_refs(self) -> None:
+        """legal_references.json 을 파일 시스템에서 읽어 self.legal_refs 로 적재."""
+        path = self._legal_refs_full_path()
+        try:
+            self.legal_refs = load_json(self.LEGAL_REFS_PATH).get("references", [])
+            self._legal_refs_mtime = os.path.getmtime(path) if os.path.exists(path) else 0.0
+        except Exception as e:
+            logger.warning(f"Failed to load legal_references.json: {e}")
+            self.legal_refs = []
+            self._legal_refs_mtime = 0.0
+
+    def _build_knowledge_graph(self) -> None:
+        """현재 FAQ + legal_refs 로 지식 그래프를 구성한다."""
         try:
             from src.knowledge_graph import KnowledgeGraph
-            self.knowledge_graph = KnowledgeGraph.build_from_faq(self.faq_items)
-        except Exception:
-            pass
+            self.knowledge_graph = KnowledgeGraph.build_from_faq(
+                self.faq_items, self.legal_refs,
+            )
+        except Exception as e:
+            logger.warning(f"Knowledge graph build failed: {e}")
+            self.knowledge_graph = None
+
+    def reload_legal_references(self) -> dict:
+        """legal_references.json 를 다시 읽고 지식 그래프를 재생성한다.
+
+        국가법령정보센터 동기화(`/api/admin/law-sync/sync`) 직후 호출되어,
+        업데이트된 법령 요약이 즉시 답변 생성에 반영되도록 한다.
+        """
+        before = len(self.legal_refs)
+        self._load_legal_refs()
+        self._build_knowledge_graph()
+        return {
+            "reloaded": True,
+            "count_before": before,
+            "count_after": len(self.legal_refs),
+            "mtime": self._legal_refs_mtime,
+        }
+
+    def _maybe_reload_legal_refs(self) -> None:
+        """legal_references.json 파일이 변경되었으면 자동 리로드한다.
+
+        (보세봇의 답변이 법령 변경과 자동으로 동기화되도록 하는 경량 훅.)
+        """
+        try:
+            path = self._legal_refs_full_path()
+            if not os.path.exists(path):
+                return
+            current_mtime = os.path.getmtime(path)
+            if current_mtime > (self._legal_refs_mtime or 0):
+                logger.info(
+                    "legal_references.json 변경 감지 — 자동 리로드 수행 "
+                    f"(mtime {self._legal_refs_mtime} → {current_mtime})"
+                )
+                self.reload_legal_references()
+        except Exception as e:
+            logger.warning(f"legal_refs mtime check failed: {e}")
+
+    def find_legal_reference(self, basis: str) -> dict | None:
+        """FAQ 의 legal_basis 문자열에 대응하는 legal_references 항목을 찾는다."""
+        if not basis or not self.legal_refs:
+            return None
+        # 정확 일치 → 부분 매칭 순으로 검색
+        best = None
+        best_score = 0
+        for ref in self.legal_refs:
+            law_name = ref.get("law_name", "")
+            article = ref.get("article", "")
+            title = ref.get("title", "")
+            score = 0
+            if law_name and law_name in basis:
+                score += len(law_name)
+            if article and article in basis:
+                score += len(article)
+            if title and title in basis:
+                score += len(title) // 2
+            if score > best_score:
+                best = ref
+                best_score = score
+        return best
+
+    @classmethod
+    def _category_matches(cls, item_category: str, query_category: str) -> bool:
+        """FAQ 항목의 카테고리와 질문 카테고리가 동일하거나 별칭 관계인지 확인한다."""
+        if not item_category or not query_category:
+            return False
+        if item_category == query_category:
+            return True
+        return cls._CATEGORY_ALIASES.get(item_category) == query_category
 
     @staticmethod
     def _normalize_faq_items(items: list[dict]) -> list[dict]:
@@ -169,24 +286,40 @@ class BondedExhibitionChatbot:
         best_score = 0
         best_keyword_hits = 0
 
-        # 1단계: 키워드 매칭
+        # 1단계: 키워드 매칭 (길이 기반 가중치 적용)
+        best_longest_kw = 0
         for item in self.faq_items:
             score = 0
             keyword_hits = 0
+            longest_kw = 0
 
-            if item.get("category") == category:
+            if self._category_matches(item.get("category"), category):
                 score += CATEGORY_BONUS
 
             keywords = item.get("keywords", [])
             for kw in keywords:
-                if kw.lower() in query_lower:
-                    score += 1
+                kw_lower = kw.lower().strip() if kw else ""
+                if kw_lower and kw_lower in query_lower:
+                    weight = _keyword_weight(kw_lower)
+                    score += weight
                     keyword_hits += 1
+                    if weight > longest_kw:
+                        longest_kw = weight
 
-            if score > best_score or (score == best_score and keyword_hits > best_keyword_hits):
+            better = False
+            if score > best_score:
+                better = True
+            elif score == best_score:
+                if keyword_hits > best_keyword_hits:
+                    better = True
+                elif keyword_hits == best_keyword_hits and longest_kw > best_longest_kw:
+                    better = True
+
+            if better:
                 best_score = score
                 best_match = item
                 best_keyword_hits = keyword_hits
+                best_longest_kw = longest_kw
 
         if best_score >= KEYWORD_SCORE_THRESHOLD and best_keyword_hits >= MIN_KEYWORD_HITS:
             return best_match
@@ -373,6 +506,9 @@ class BondedExhibitionChatbot:
     def _process_new_query(self, query: str, session=None) -> dict:
         """새 질문을 처리한다. 새 파이프라인을 사용한다.
 
+        국가법령정보센터 동기화로 legal_references.json 이 변경되었는지
+        여기서 가볍게 확인하여 변경 시 자동 리로드한다.
+
         파이프라인:
         1. 오타 교정 + 동의어 확장
         2. 의도 분류 (새 30-intent 시스템)
@@ -384,6 +520,9 @@ class BondedExhibitionChatbot:
         8. 에스컬레이션 확인
         9. 응답 구성
         """
+        # 법령 동기화로 파일이 갱신되었으면 자동 리로드
+        self._maybe_reload_legal_refs()
+
         processed_query, corrections = self._preprocess_query(query)
 
         # 2단계: 의도 분류 (새 30-intent 시스템)
@@ -492,16 +631,21 @@ class BondedExhibitionChatbot:
                     risk_level, policy_decision, escalation_triggered,
                 )
 
-            # 법령 가이드 요약 추출 (지식 그래프 연계)
+            # 법령 가이드 요약 추출 — 지식 그래프 우선, 부재 시 legal_refs 직접 조회
             legal_guide = []
-            if self.knowledge_graph:
-                for basis in faq_match.get("legal_basis", []):
+            for basis in faq_match.get("legal_basis", []):
+                summary = ""
+                if self.knowledge_graph:
                     law_node_id = f"law_{basis}"
                     if law_node_id in self.knowledge_graph.nodes:
                         node_data = self.knowledge_graph.nodes[law_node_id].get("data", {})
-                        summary = node_data.get("summary")
-                        if summary:
-                            legal_guide.append(f"{basis}: {summary}")
+                        summary = node_data.get("summary") or ""
+                if not summary:
+                    ref = self.find_legal_reference(basis)
+                    if ref:
+                        summary = ref.get("summary") or ""
+                if summary:
+                    legal_guide.append(f"{basis}: {summary}")
 
             response = build_response(
                 topic=category_name,
