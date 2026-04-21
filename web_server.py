@@ -1950,6 +1950,52 @@ def admin_law_sync_faq_pending_clear():
     return jsonify(result)
 
 
+@app.route("/api/admin/law-sync/status", methods=["GET"])
+@jwt_auth.require_auth()
+def admin_law_sync_status():
+    """법령 동기화 파이프라인의 종합 상태를 한 번에 반환한다."""
+    try:
+        recent_changes = law_sync_manager.get_recent_changes(limit=10)
+        faq_data = load_json("data/faq.json")
+        pending_ids = [
+            item.get("id")
+            for item in faq_data.get("items", [])
+            if item.get("law_update_pending")
+        ]
+        last_history_entry = None
+        history = law_update_scheduler.get_update_history()
+        if history:
+            last_history_entry = history[-1]
+
+        return jsonify({
+            "scheduler": {
+                "running": law_update_scheduler._running,
+                "interval_hours": law_update_scheduler._interval_hours,
+                "has_sync_manager": law_update_scheduler.sync_manager is not None,
+            },
+            "recent_changes": recent_changes,
+            "pending_faq_count": len(pending_ids),
+            "pending_faq_ids": pending_ids,
+            "last_run": last_history_entry,
+            "monitored_laws": law_sync_manager.get_monitored_laws(),
+        })
+    except Exception as e:
+        logger.error(f"법령 동기화 상태 조회 실패: {e}")
+        return jsonify({"error": str(e)}), 500
+
+
+@app.route("/api/admin/chatbot/reload", methods=["POST"])
+@jwt_auth.require_auth()
+def admin_chatbot_reload():
+    """챗봇 FAQ/법령 근거를 수동으로 재로딩한다."""
+    try:
+        result = chatbot.reload_faq()
+        return jsonify({"status": "reloaded", **result})
+    except Exception as e:
+        logger.error(f"챗봇 리로드 실패: {e}")
+        return jsonify({"error": str(e)}), 500
+
+
 @app.route("/api/admin/backup", methods=["POST"])
 @jwt_auth.require_auth()
 def admin_backup_create():

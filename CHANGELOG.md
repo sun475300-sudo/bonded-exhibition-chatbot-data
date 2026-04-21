@@ -4,6 +4,14 @@
 
 형식: [Keep a Changelog](https://keepachangelog.com/ko/1.1.0/)
 
+## [14.4.0] - 2026-04-21
+
+### Added
+- `GET /api/admin/law-sync/status`: 스케줄러 실행 상태, 최근 변경 10건,
+  재검토 대기 FAQ ID, 마지막 풀 사이클 결과, 모니터링 대상 법령을 한 번에 반환.
+- `POST /api/admin/chatbot/reload`: 관리자 수동 FAQ 핫 리로드 엔드포인트.
+- 위 두 엔드포인트에 대한 통합 테스트 2건 추가.
+
 ## [14.3.0] - 2026-04-21
 
 ### Added

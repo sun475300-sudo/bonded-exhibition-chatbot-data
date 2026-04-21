@@ -158,6 +158,28 @@ class TestLawSyncAPI:
         assert "pending" in data
         assert "count" in data
 
+    def test_status_endpoint(self, client):
+        """GET /api/admin/law-sync/status 는 스케줄러 상태/변경 이력/대기 FAQ를 한 번에 반환한다."""
+        res = client.get("/api/admin/law-sync/status")
+        assert res.status_code == 200
+        data = res.get_json()
+        assert "scheduler" in data
+        assert "running" in data["scheduler"]
+        assert "has_sync_manager" in data["scheduler"]
+        assert data["scheduler"]["has_sync_manager"] is True
+        assert "recent_changes" in data
+        assert "pending_faq_count" in data
+        assert "monitored_laws" in data
+
+    def test_chatbot_reload_endpoint(self, client):
+        """POST /api/admin/chatbot/reload 는 FAQ를 재로딩하고 개수를 반환한다."""
+        res = client.post("/api/admin/chatbot/reload")
+        assert res.status_code == 200
+        data = res.get_json()
+        assert data["status"] == "reloaded"
+        assert "faq_items" in data
+        assert data["faq_items"] >= 1
+
 
 class TestPropagateToFAQ:
     """법령 변경이 FAQ 항목에 전파되는지 검증."""
