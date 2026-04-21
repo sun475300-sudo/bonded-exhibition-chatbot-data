@@ -375,9 +375,21 @@ class LawUpdateScheduler:
         self,
         version_tracker: LawVersionTracker | None = None,
         notifier: FAQUpdateNotifier | None = None,
+        sync_manager=None,
+        on_propagate=None,
     ):
+        """
+        Args:
+            version_tracker: 버전 추적기
+            notifier: FAQ 알림 관리자
+            sync_manager: 국가법령정보센터 API 클라이언트 (있으면 스케줄 실행 시
+                          원문 fetch → legal_references 업데이트 → FAQ 전파까지 수행).
+            on_propagate: FAQ 전파 직후 호출될 콜백(예: chatbot.reload_faq).
+        """
         self.version_tracker = version_tracker or LawVersionTracker()
         self.notifier = notifier or FAQUpdateNotifier()
+        self.sync_manager = sync_manager
+        self.on_propagate = on_propagate
         self._timer: threading.Timer | None = None
         self._running = False
         self._interval_hours: float = 24
@@ -405,9 +417,60 @@ class LawUpdateScheduler:
     def _run_check(self):
         """예약된 확인을 실행한다."""
         try:
-            self.check_for_updates()
+            if self.sync_manager is not None:
+                self.run_full_sync()
+            else:
+                self.check_for_updates()
         finally:
             self._schedule_next()
+
+    def run_full_sync(self) -> dict:
+        """국가법령정보센터 API에서 원문을 가져와 FAQ까지 전파하는 풀 사이클을 실행한다.
+
+        `sync_manager`가 주입되어 있을 때만 호출 가능하다.
+
+        Returns:
+            {
+                "checked_at": str,
+                "changes_detected": int,
+                "propagated": int,
+                "propagated_items": list[str],
+                "details": list[dict],
+            }
+        """
+        if self.sync_manager is None:
+            raise RuntimeError("sync_manager is not configured")
+
+        sync_result = self.sync_manager.sync_and_propagate()
+        check = sync_result.get("check", {})
+        propagation = sync_result.get("faq_propagation", {})
+
+        # 변경 이력을 scheduler 기록에도 반영
+        for detail in check.get("details", []):
+            if detail.get("status") == "changed":
+                law_name = detail.get("law_name", "")
+                article = detail.get("article", "")
+                content_preview = detail.get("content_preview", "")
+                if law_name and article:
+                    self.version_tracker.record_version(law_name, article, content_preview)
+                    self.notifier.create_notifications(law_name, article)
+
+        # 콜백: chatbot.reload_faq 등
+        if propagation.get("propagated", 0) > 0 and self.on_propagate is not None:
+            try:
+                self.on_propagate()
+            except Exception:  # noqa: BLE001 (callback errors should not break sync)
+                pass
+
+        result = {
+            "checked_at": datetime.now().isoformat(),
+            "changes_detected": check.get("changes_detected", 0),
+            "propagated": propagation.get("propagated", 0),
+            "propagated_items": propagation.get("items", []),
+            "details": check.get("details", []),
+        }
+        self._update_history.append(result)
+        return result
 
     def stop(self):
         """스케줄러를 중지한다."""

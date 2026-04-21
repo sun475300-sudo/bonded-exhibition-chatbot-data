@@ -156,7 +156,6 @@ jwt_auth = JWTAuth()
 # 법령 업데이트 모듈 초기화
 law_version_tracker = LawVersionTracker()
 faq_update_notifier = FAQUpdateNotifier()
-law_update_scheduler = LawUpdateScheduler(law_version_tracker, faq_update_notifier)
 
 # 백업 관리자 초기화
 backup_manager = BackupManager()
@@ -1835,6 +1834,24 @@ def admin_law_updates_acknowledge():
 from src.law_api_sync import LawSyncManager
 law_sync_manager = LawSyncManager()
 
+# 스케줄러를 sync_manager와 챗봇 핫 리로드에 연결
+law_update_scheduler = LawUpdateScheduler(
+    law_version_tracker,
+    faq_update_notifier,
+    sync_manager=law_sync_manager,
+    on_propagate=lambda: chatbot.reload_faq(),
+)
+
+# LAW_SYNC_AUTOSTART=1 이면 서버 기동 시 자동 스케줄 시작
+# LAW_SYNC_INTERVAL_HOURS로 주기 조정 (기본 24시간)
+if os.environ.get("LAW_SYNC_AUTOSTART") == "1":
+    try:
+        _interval = float(os.environ.get("LAW_SYNC_INTERVAL_HOURS", "24"))
+        law_update_scheduler.schedule_check(interval_hours=_interval)
+        logger.info(f"법령 동기화 스케줄러 시작 (주기: {_interval}시간)")
+    except Exception as _e:
+        logger.warning(f"법령 동기화 스케줄러 시작 실패: {_e}")
+
 
 @app.route("/api/admin/law-sync/check", methods=["POST"])
 @jwt_auth.require_auth()
@@ -1877,6 +1894,106 @@ def admin_law_sync_history():
 def admin_law_sync_monitored():
     """모니터링 대상 법령 목록을 조회한다."""
     return jsonify({"laws": law_sync_manager.get_monitored_laws()})
+
+
+@app.route("/api/admin/law-sync/propagate", methods=["POST"])
+@jwt_auth.require_auth()
+def admin_law_sync_propagate():
+    """법령 변경 확인 → legal_references.json → faq.json 전파를 한 번에 실행한다.
+
+    전파가 완료되면 chatbot 인스턴스의 FAQ 데이터도 재로딩하여 사용자가
+    다음 질문을 할 때 최신 법령 반영 상태가 즉시 적용되도록 한다.
+    """
+    try:
+        result = law_sync_manager.sync_and_propagate()
+        # 전파가 있었으면 챗봇 FAQ 핫 리로드
+        if result.get("faq_propagation", {}).get("propagated", 0) > 0:
+            try:
+                chatbot.reload_faq()
+            except Exception as reload_err:
+                logger.warning(f"챗봇 FAQ 재로딩 실패: {reload_err}")
+        return jsonify(result)
+    except Exception as e:
+        logger.error(f"법령 동기화 전파 실패: {e}")
+        return jsonify({"error": str(e)}), 500
+
+
+@app.route("/api/admin/law-sync/faq-pending", methods=["GET"])
+@jwt_auth.require_auth()
+def admin_law_sync_faq_pending():
+    """법령 변경으로 재검토 대기 중인 FAQ 항목 목록을 반환한다."""
+    faq_data = load_json("data/faq.json")
+    pending = [
+        {
+            "id": item.get("id"),
+            "question": item.get("question"),
+            "legal_basis": item.get("legal_basis", []),
+            "last_law_sync": item.get("last_law_sync"),
+        }
+        for item in faq_data.get("items", [])
+        if item.get("law_update_pending")
+    ]
+    return jsonify({"pending": pending, "count": len(pending)})
+
+
+@app.route("/api/admin/law-sync/faq-pending/clear", methods=["POST"])
+@jwt_auth.require_auth()
+def admin_law_sync_faq_pending_clear():
+    """수동 검토 완료된 FAQ의 law_update_pending 플래그를 해제한다."""
+    data = request.get_json(silent=True) or {}
+    faq_ids = data.get("faq_ids")
+    result = law_sync_manager.clear_faq_pending_flags(faq_ids=faq_ids)
+    try:
+        chatbot.reload_faq()
+    except Exception as reload_err:
+        logger.warning(f"챗봇 FAQ 재로딩 실패: {reload_err}")
+    return jsonify(result)
+
+
+@app.route("/api/admin/law-sync/status", methods=["GET"])
+@jwt_auth.require_auth()
+def admin_law_sync_status():
+    """법령 동기화 파이프라인의 종합 상태를 한 번에 반환한다."""
+    try:
+        recent_changes = law_sync_manager.get_recent_changes(limit=10)
+        faq_data = load_json("data/faq.json")
+        pending_ids = [
+            item.get("id")
+            for item in faq_data.get("items", [])
+            if item.get("law_update_pending")
+        ]
+        last_history_entry = None
+        history = law_update_scheduler.get_update_history()
+        if history:
+            last_history_entry = history[-1]
+
+        return jsonify({
+            "scheduler": {
+                "running": law_update_scheduler._running,
+                "interval_hours": law_update_scheduler._interval_hours,
+                "has_sync_manager": law_update_scheduler.sync_manager is not None,
+            },
+            "recent_changes": recent_changes,
+            "pending_faq_count": len(pending_ids),
+            "pending_faq_ids": pending_ids,
+            "last_run": last_history_entry,
+            "monitored_laws": law_sync_manager.get_monitored_laws(),
+        })
+    except Exception as e:
+        logger.error(f"법령 동기화 상태 조회 실패: {e}")
+        return jsonify({"error": str(e)}), 500
+
+
+@app.route("/api/admin/chatbot/reload", methods=["POST"])
+@jwt_auth.require_auth()
+def admin_chatbot_reload():
+    """챗봇 FAQ/법령 근거를 수동으로 재로딩한다."""
+    try:
+        result = chatbot.reload_faq()
+        return jsonify({"status": "reloaded", **result})
+    except Exception as e:
+        logger.error(f"챗봇 리로드 실패: {e}")
+        return jsonify({"error": str(e)}), 500
 
 
 @app.route("/api/admin/backup", methods=["POST"])

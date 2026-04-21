@@ -19,12 +19,23 @@ def build_response(
     is_escalation: bool = False,
     escalation_message: str = "",
     legal_guide: list[str] | None = None,
+    law_update_pending: bool = False,
+    last_law_sync: str | None = None,
 ) -> str:
     """구조화된 답변 문자열을 생성한다."""
     parts = []
 
     parts.append(f"문의하신 내용은 [{topic}]에 관한 사항입니다.")
     parts.append("")
+
+    if law_update_pending:
+        sync_note = f" (최근 동기화: {last_law_sync})" if last_law_sync else ""
+        parts.append(
+            "⚠️ 최근 국가법령정보센터에서 관련 법령 본문 변경이 감지되었습니다"
+            f"{sync_note}. 본 답변은 기존 FAQ 기반이며, 최신 법령 전문은 "
+            "국가법령정보센터(https://www.law.go.kr)에서 다시 확인하시기 바랍니다."
+        )
+        parts.append("")
 
     if conclusion:
         parts.append("결론:")

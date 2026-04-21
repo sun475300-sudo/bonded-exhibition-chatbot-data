@@ -4,6 +4,64 @@
 
 형식: [Keep a Changelog](https://keepachangelog.com/ko/1.1.0/)
 
+## [14.4.0] - 2026-04-21
+
+### Added
+- `GET /api/admin/law-sync/status`: 스케줄러 실행 상태, 최근 변경 10건,
+  재검토 대기 FAQ ID, 마지막 풀 사이클 결과, 모니터링 대상 법령을 한 번에 반환.
+- `POST /api/admin/chatbot/reload`: 관리자 수동 FAQ 핫 리로드 엔드포인트.
+- 위 두 엔드포인트에 대한 통합 테스트 2건 추가.
+
+## [14.3.0] - 2026-04-21
+
+### Added
+- 관세법 제119조(불복의 신청) `customs_act_119` 항목을 legal_references.json에 추가.
+- FAQ/법령 URL 정확성 검증 테스트 3건 추가 (`TestLegalReferencesURLs`,
+  `TestFAQCorrectness.test_import_terminology_note_in_ae`).
+
+### Changed
+- `legal_references.json`의 관세법·시행령 조항 URL을 비표준 `lsInfoP.do`·
+  `lsLawLinkInfo.do` 형식에서 일관된 `lsLinkProc.do?lsNm=...&joNo=...` 형식으로
+  통일. (빈 URL도 모두 채움.) 법령 업데이트 알림에서 사용자가 국가법령정보센터
+  해당 조문 페이지로 한 번에 이동할 수 있도록 함.
+- FAQ 시행령 제101조·제102조 요약에 `수입신고 수리(구 '수입면허')` 용어 병기.
+- FAQ **AE(판매 전 수입면허 신청 절차)** 답변을 현행 실무 용어(`수입신고
+  수리`)로 재작성하고 시행령 구 표현과의 관계를 `notes`에 부기. 키워드에
+  `수입신고 수리` 추가.
+
+## [14.2.0] - 2026-04-21
+
+### Added
+- `LawUpdateScheduler`를 `LawSyncManager`와 연결하여 예약된 확인 주기마다
+  국가법령정보센터 API 원문 → legal_references → FAQ 전파까지 풀 사이클로 실행.
+  - 새 파라미터: `sync_manager`, `on_propagate` 콜백
+  - 새 메서드: `run_full_sync` (sync_manager 주입 시 사용)
+  - 환경변수 `LAW_SYNC_AUTOSTART=1`로 서버 기동 시 자동 시작,
+    `LAW_SYNC_INTERVAL_HOURS`로 주기 조정 (기본 24시간)
+  - 전파가 발생하면 챗봇 인스턴스의 `reload_faq`를 자동 호출하여
+    재시작 없이 최신 법령 상태를 반영
+- `tests/test_law_updater.py`: `TestLawUpdateSchedulerFullSync` 4건 추가
+  (콜백 호출 / 미호출 / sync_manager 누락 / 콜백 예외 스왈로 검증)
+
+## [14.1.0] - 2026-04-21
+
+### Added
+- 국가법령정보센터 API 변경 감지 시 FAQ 답변까지 자동 전파되도록 확장
+  - `LawSyncManager.propagate_to_faq`: 변경된 법령을 인용한 FAQ 항목에 `law_update_pending`·`last_law_sync` 플래그 기록
+  - `LawSyncManager.sync_and_propagate`: 법령 확인 → legal_references.json 갱신 → FAQ 전파까지 한 번에 수행
+  - `LawSyncManager.clear_faq_pending_flags`: 관리자가 수동 검토한 FAQ의 재검토 플래그 해제
+  - `LawSyncManager.get_recent_changes`: 변경 이력 중 실제 변경분만 필터링
+- 새 엔드포인트: `/api/admin/law-sync/propagate`, `/api/admin/law-sync/faq-pending`, `/api/admin/law-sync/faq-pending/clear`
+- `BondedExhibitionChatbot.reload_faq`: 법령 전파 후 챗봇 재시작 없이 FAQ·법령 근거 핫 리로드
+- `build_response`에 `law_update_pending`·`last_law_sync` 지원: 최근 법령 변경이 감지된 FAQ 답변에는 국가법령정보센터 재확인 안내 문구 추가
+- 모니터링 대상에 관세법 제119조(심사와 심판) 추가
+
+### Fixed
+- FAQ 항목 **AQ(관세 불복 절차)**에서 잘못된 법전 편(編) 인용 수정
+  - 기존: "관세법 제7편(불복절차)" → 수정: "관세법 제5장(납세자의 권리 및 불복절차) 제2절(심사와 심판, 제119조부터 제132조)"
+  - `legal_basis`에 `관세법 제119조` 명시
+  - 심사청구(관세청장)·심판청구(조세심판원장)·이의신청(처분 세관장) 주체 구분을 문구에 반영
+
 ## [14.0.0] - 2026-04-02
 
 ### Added

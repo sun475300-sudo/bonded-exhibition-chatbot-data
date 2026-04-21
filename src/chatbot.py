@@ -138,6 +138,32 @@ class BondedExhibitionChatbot:
             normalized.append(n)
         return normalized
 
+    def reload_faq(self) -> dict:
+        """faq.json과 legal_references.json을 재로딩하여 답변에 최신 법령 상태를 반영한다.
+
+        법령 동기화 전파 후 호출되어 챗봇 재시작 없이 변경분이 즉시 유효하도록 한다.
+
+        Returns:
+            {"faq_items": int, "legal_refs": int}
+        """
+        self.faq_data = load_json("data/faq.json")
+        try:
+            self.legal_refs = load_json("data/legal_references.json").get("references", [])
+        except Exception as e:
+            logger.warning(f"Failed to reload legal_references.json: {e}")
+            self.legal_refs = []
+        self.faq_items = self._normalize_faq_items(self.faq_data.get("items", []))
+        self.tfidf_matcher = TFIDFMatcher(self.faq_items)
+        self.related_faq_finder = RelatedFAQFinder(self.faq_items)
+        self._classifier_cache.clear()
+        # 벡터 검색은 FAQ 항목에 기반하므로 가능하면 갱신
+        if self.vector_search_enabled and self.vector_search is not None:
+            try:
+                self.vector_search = VectorSearchEngine(self.faq_items)
+            except Exception as e:
+                logger.warning(f"Vector search re-init failed: {e}")
+        return {"faq_items": len(self.faq_items), "legal_refs": len(self.legal_refs)}
+
     def _cached_classify(self, query: str) -> list[str]:
         """Classify a query with LRU caching (max 100 entries)."""
         if query in self._classifier_cache:
@@ -512,6 +538,8 @@ class BondedExhibitionChatbot:
                 is_escalation=escalation_triggered,
                 escalation_message=escalation["message"] if escalation else "",
                 legal_guide=legal_guide if legal_guide else None,
+                law_update_pending=bool(faq_match.get("law_update_pending")),
+                last_law_sync=faq_match.get("last_law_sync"),
             )
 
             # 7단계: 답변 필터링 (면책조항 추가)
@@ -590,6 +618,8 @@ class BondedExhibitionChatbot:
             confirmation_items=None,
             is_escalation=escalation is not None,
             escalation_message=escalation["message"] if escalation else "",
+            law_update_pending=bool(faq_match.get("law_update_pending")),
+            last_law_sync=faq_match.get("last_law_sync"),
         )
 
         # 확인 결과 요약 추가

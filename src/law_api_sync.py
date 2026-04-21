@@ -26,12 +26,13 @@ from urllib.parse import quote
 BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 DB_PATH = os.path.join(BASE_DIR, "data", "law_sync.db")
 LEGAL_REF_PATH = os.path.join(BASE_DIR, "data", "legal_references.json")
+FAQ_PATH = os.path.join(BASE_DIR, "data", "faq.json")
 
 LAW_API_BASE = "https://www.law.go.kr/DRF/lawService.do"
 LAW_SEARCH_BASE = "https://www.law.go.kr/DRF/lawSearch.do"
 
 MONITORED_LAWS = [
-    {"law_name": "관세법", "articles": ["제190조", "제161조", "제269조", "제183조", "제174조", "제226조"]},
+    {"law_name": "관세법", "articles": ["제190조", "제161조", "제269조", "제183조", "제174조", "제226조", "제119조"]},
     {"law_name": "관세법 시행령", "articles": ["제101조", "제102조", "제208조"]},
 ]
 
@@ -295,6 +296,121 @@ class LawSyncManager:
         """모니터링 대상 법령 목록을 반환한다."""
         return MONITORED_LAWS
 
+    def get_recent_changes(self, limit=50):
+        """최근 변경(changed=1) 이력만 반환한다."""
+        conn = sqlite3.connect(self.db_path)
+        try:
+            cursor = conn.execute(
+                """SELECT law_name, article, content_hash, content_preview,
+                          previous_hash, checked_at
+                   FROM law_sync_log WHERE changed = 1
+                   ORDER BY id DESC LIMIT ?""",
+                (limit,),
+            )
+            return [
+                {
+                    "law_name": r[0], "article": r[1], "content_hash": r[2],
+                    "content_preview": r[3], "previous_hash": r[4],
+                    "checked_at": r[5],
+                }
+                for r in cursor.fetchall()
+            ]
+        finally:
+            conn.close()
+
+    def propagate_to_faq(self, faq_path=None, changes=None):
+        """법령 변경을 FAQ 항목에 전파한다.
+
+        변경된 법령을 legal_basis에 인용하는 FAQ 항목에 `last_law_sync`와
+        `law_update_pending` 플래그를 기록하여 보세봇이 응답 시 최신 법령
+        변경이 있었음을 사용자에게 알릴 수 있도록 한다.
+
+        Args:
+            faq_path: faq.json 경로 (없으면 기본값)
+            changes: 전파 대상 변경 목록. None이면 가장 최근 변경분 전체 사용.
+
+        Returns:
+            {"propagated": int, "total_faq": int, "items": list[str]}
+        """
+        path = faq_path or FAQ_PATH
+        if not os.path.exists(path):
+            return {"propagated": 0, "total_faq": 0, "items": []}
+
+        with open(path, "r", encoding="utf-8") as f:
+            data = json.load(f)
+
+        change_list = changes if changes is not None else self.get_recent_changes(limit=200)
+        items = data.get("items", [])
+        propagated_ids = []
+
+        for change in change_list:
+            law_name = change.get("law_name", "")
+            article = change.get("article", "")
+            fetched_at = change.get("checked_at", datetime.now().isoformat())
+            if not law_name or not article:
+                continue
+            for item in items:
+                if item.get("id") in propagated_ids:
+                    continue
+                basis_list = item.get("legal_basis", [])
+                matched = any(
+                    law_name in basis and article in basis for basis in basis_list
+                )
+                if matched:
+                    item["last_law_sync"] = fetched_at
+                    item["law_update_pending"] = True
+                    propagated_ids.append(item.get("id"))
+
+        if propagated_ids:
+            data["last_updated"] = datetime.now().date().isoformat()
+            with open(path, "w", encoding="utf-8") as f:
+                json.dump(data, f, ensure_ascii=False, indent=2)
+
+        return {
+            "propagated": len(propagated_ids),
+            "total_faq": len(items),
+            "items": propagated_ids,
+        }
+
+    def clear_faq_pending_flags(self, faq_path=None, faq_ids=None):
+        """관리자가 수동 검토한 FAQ의 law_update_pending 플래그를 해제한다.
+
+        Args:
+            faq_path: faq.json 경로 (없으면 기본값)
+            faq_ids: 플래그를 해제할 FAQ ID 목록. None이면 전체 해제.
+
+        Returns:
+            {"cleared": int}
+        """
+        path = faq_path or FAQ_PATH
+        if not os.path.exists(path):
+            return {"cleared": 0}
+        with open(path, "r", encoding="utf-8") as f:
+            data = json.load(f)
+        cleared = 0
+        for item in data.get("items", []):
+            if not item.get("law_update_pending"):
+                continue
+            if faq_ids is None or item.get("id") in faq_ids:
+                item["law_update_pending"] = False
+                cleared += 1
+        if cleared:
+            with open(path, "w", encoding="utf-8") as f:
+                json.dump(data, f, ensure_ascii=False, indent=2)
+        return {"cleared": cleared}
+
+    def sync_and_propagate(self, faq_path=None):
+        """전체 법령 확인 → legal_references 업데이트 → FAQ 전파를 한 번에 수행한다."""
+        check_result = self.check_all()
+        update_result = self.update_legal_references()
+        changed = [d for d in check_result.get("details", []) if d.get("status") == "changed"]
+        propagate_result = self.propagate_to_faq(faq_path=faq_path, changes=changed)
+        return {
+            "check": check_result,
+            "legal_references_update": update_result,
+            "faq_propagation": propagate_result,
+        }
+
 
 if __name__ == "__main__":
     import argparse
@@ -302,6 +418,8 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="국가법령정보센터 동기화")
     parser.add_argument("--check", action="store_true", help="변경 확인만")
     parser.add_argument("--sync", action="store_true", help="변경 확인 + legal_references 업데이트")
+    parser.add_argument("--propagate", action="store_true",
+                        help="변경 확인 + legal_references + FAQ 전파를 한 번에 수행")
     parser.add_argument("--history", action="store_true", help="동기화 이력 조회")
     args = parser.parse_args()
 
@@ -312,6 +430,15 @@ if __name__ == "__main__":
         for h in history:
             mark = "변경" if h["changed"] else "동일"
             print(f"[{mark}] {h['law_name']} {h['article']} - {h['checked_at']}")
+    elif args.propagate:
+        print("법령 변경 → legal_references → FAQ 전파 실행 중...")
+        result = manager.sync_and_propagate()
+        print(f"확인: {result['check']['total_checked']}개, "
+              f"변경: {result['check']['changes_detected']}개, "
+              f"오류: {result['check']['errors']}개")
+        print(f"legal_references 업데이트: {result['legal_references_update']['updated']}개")
+        print(f"FAQ 전파: {result['faq_propagation']['propagated']}개 "
+              f"({', '.join(result['faq_propagation']['items'])})")
     elif args.sync:
         print("법령 변경 확인 중...")
         result = manager.check_all()

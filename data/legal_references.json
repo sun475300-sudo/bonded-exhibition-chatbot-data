@@ -15,7 +15,7 @@
       "article": "제161조",
       "title": "견본품의 반출",
       "summary": "보세구역에 장치된 외국물품의 전부 또는 일부를 견본품으로 반출하려면 세관장의 허가가 필요하며, 세관장은 신청일부터 10일 이내에 허가 여부를 통지해야 함",
-      "url": "https://www.law.go.kr/lsLawLinkInfo.do?lsJoLnkSeq=900016690",
+      "url": "https://www.law.go.kr/lsLinkProc.do?lsNm=관세법&joNo=016100000",
       "keywords": ["견본품", "반출", "허가", "세관장", "샘플"]
     },
     {
@@ -23,17 +23,17 @@
       "law_name": "관세법 시행령",
       "article": "제101조",
       "title": "판매용품의 면허전 사용금지",
-      "summary": "보세전시장에 장치된 판매용 외국물품은 수입면허를 받기 전에는 사용할 수 없음",
-      "url": "https://www.law.go.kr/LSW/lsInfoP.do?lsiSeq=10996",
-      "keywords": ["판매용", "면허전", "사용금지", "수입면허"]
+      "summary": "보세전시장에 장치된 판매용 외국물품은 수입신고 수리(구 '수입면허')를 받기 전에는 사용할 수 없음",
+      "url": "https://www.law.go.kr/lsLinkProc.do?lsNm=관세법 시행령&joNo=010100000",
+      "keywords": ["판매용", "면허전", "사용금지", "수입면허", "수입신고 수리"]
     },
     {
       "id": "customs_decree_102",
       "law_name": "관세법 시행령",
       "article": "제102조",
       "title": "직매된 전시용품의 통관전 반출금지",
-      "summary": "전시용 외국물품을 현장에서 직매하는 경우에도 수입면허를 받기 전에는 인도할 수 없음",
-      "url": "https://www.law.go.kr/LSW/lsInfoP.do?lsiSeq=10850",
+      "summary": "전시용 외국물품을 현장에서 직매하는 경우에도 수입신고 수리(구 '수입면허')를 받기 전에는 인도할 수 없음",
+      "url": "https://www.law.go.kr/lsLinkProc.do?lsNm=관세법 시행령&joNo=010200000",
       "keywords": ["직매", "전시용품", "통관전", "반출금지", "인도"]
     },
     {
@@ -42,7 +42,7 @@
       "article": "제226조",
       "title": "허가·승인 등의 증명 및 확인",
       "summary": "세관장확인 대상 물품의 수출입 요건 확인에 관한 규정",
-      "url": "",
+      "url": "https://www.law.go.kr/lsLinkProc.do?lsNm=관세법&joNo=022600000",
       "keywords": ["세관장확인", "요건확인", "허가", "승인"]
     },
     {
@@ -51,7 +51,7 @@
       "article": "제269조",
       "title": "밀수출입죄",
       "summary": "허가 없이 보세구역 물품을 반출하거나 수출입 신고 없이 물품을 수출입하는 경우의 벌칙 규정",
-      "url": "",
+      "url": "https://www.law.go.kr/lsLinkProc.do?lsNm=관세법&joNo=026900000",
       "keywords": ["밀수", "밀수출입", "벌칙", "무허가 반출", "처벌"]
     },
     {
@@ -60,8 +60,17 @@
       "article": "제183조",
       "title": "보세창고",
       "summary": "외국물품이나 통관을 하고자 하는 물품을 장치하기 위한 보세구역으로, 보세전시장과 구분되는 장기 장치용 구역",
-      "url": "",
+      "url": "https://www.law.go.kr/lsLinkProc.do?lsNm=관세법&joNo=018300000",
       "keywords": ["보세창고", "장치", "장기", "외국물품"]
+    },
+    {
+      "id": "customs_act_119",
+      "law_name": "관세법",
+      "article": "제119조",
+      "title": "불복의 신청",
+      "summary": "관세 부과 등 처분에 불복하는 자는 처분을 알게 된 날부터 90일 이내에 이의신청(처분 세관장)·심사청구(관세청장)·심판청구(조세심판원장) 중 하나를 제기할 수 있음",
+      "url": "https://www.law.go.kr/lsLinkProc.do?lsNm=관세법&joNo=011900000",
+      "keywords": ["불복", "이의신청", "심사청구", "심판청구", "90일"]
     },
     {
       "id": "bonded_exhibition_notice",
