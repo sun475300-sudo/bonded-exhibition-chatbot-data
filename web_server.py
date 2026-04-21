@@ -1864,6 +1864,23 @@ def admin_law_sync_apply():
         return jsonify({"error": str(e)}), 500
 
 
+@app.route("/api/admin/law-sync/propagate", methods=["POST"])
+@jwt_auth.require_auth()
+def admin_law_sync_propagate():
+    """국가법령정보센터 → legal_references.json → faq.json 전체 파이프라인을 실행한다.
+
+    변경이 감지된 조문을 참조하는 FAQ 항목에 law_snapshot/last_synced 메타데이터가
+    기록되고, 동일 변경에 대해 관리자 알림(FAQUpdateNotifier)이 생성되어 검수
+    요청이 대시보드에 표시된다.
+    """
+    try:
+        result = law_sync_manager.sync_and_propagate(notifier=faq_update_notifier)
+        return jsonify(result)
+    except Exception as e:
+        logger.error(f"법령 전체 파이프라인 실패: {e}")
+        return jsonify({"error": str(e)}), 500
+
+
 @app.route("/api/admin/law-sync/history", methods=["GET"])
 @jwt_auth.require_auth()
 def admin_law_sync_history():
