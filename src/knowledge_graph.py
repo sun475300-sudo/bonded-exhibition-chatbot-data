@@ -237,13 +237,56 @@ class KnowledgeGraph:
         graph = cls()
 
         # 법령 참조 데이터를 맵으로 변환 (빠른 조회를 위해)
-        law_ref_map = {}
+        # FAQ 의 legal_basis 문자열은 "관세법 제190조" 처럼 법령명과 조문이
+        # 결합된 형태이므로, 두 필드를 결합한 키와 조문 단독 키 모두를
+        # 등록하여 부분 매칭이 가능하도록 한다.
+        law_ref_map: Dict[str, Dict] = {}
+        law_refs_list: List[Dict] = []
         if law_references:
             for ref in law_references:
-                # 'article' 필드를 키로 사용 (예: "제190조")
-                article = ref.get("article")
+                article = ref.get("article", "")
+                law_name = ref.get("law_name", "")
                 if article:
-                    law_ref_map[article] = ref
+                    # 조문 단독 (뒤늦게 등록되면 덮어쓰지 않음)
+                    law_ref_map.setdefault(article, ref)
+                if law_name and article:
+                    law_ref_map[f"{law_name} {article}"] = ref
+                if law_name:
+                    law_ref_map.setdefault(law_name, ref)
+                law_refs_list.append(ref)
+
+        def _lookup_ref(basis: str) -> Dict:
+            """legal_basis 문자열에 가장 잘 맞는 법령 참조를 찾는다."""
+            if not basis:
+                return {}
+            # 1) 정확/완전 일치
+            if basis in law_ref_map:
+                return law_ref_map[basis]
+            # 2) "법령명 조문" 조합이 basis 에 포함되는 ref 선택
+            best = {}
+            best_len = 0
+            for ref in law_refs_list:
+                law_name = ref.get("law_name", "")
+                article = ref.get("article", "")
+                if law_name and article and law_name in basis and article in basis:
+                    # 더 구체적으로 일치하는 ref(law_name + article 길이 합) 선호
+                    score = len(law_name) + len(article)
+                    if score > best_len:
+                        best = ref
+                        best_len = score
+            if best:
+                return best
+            # 3) 조문만이라도 일치하는 ref
+            for ref in law_refs_list:
+                article = ref.get("article", "")
+                if article and article in basis:
+                    return ref
+            # 4) 법령명만 일치
+            for ref in law_refs_list:
+                law_name = ref.get("law_name", "")
+                if law_name and law_name in basis:
+                    return ref
+            return {}
 
         # Collect unique categories and legal bases
         categories: Dict[str, List[str]] = {}
@@ -270,12 +313,14 @@ class KnowledgeGraph:
             for basis in item.get("legal_basis", []):
                 law_id = f"law_{basis}"
                 if law_id not in graph.nodes:
-                    # 법령 참조 데이터에서 요약 정보 가져오기
-                    ref_data = law_ref_map.get(basis, {})
+                    # 법령 참조 데이터에서 요약 정보 가져오기 (부분 매칭 지원)
+                    ref_data = _lookup_ref(basis)
                     node_data = {
                         "name": basis,
                         "title": ref_data.get("title", ""),
-                        "summary": ref_data.get("summary", "")
+                        "summary": ref_data.get("summary", ""),
+                        "url": ref_data.get("url", ""),
+                        "last_synced": ref_data.get("last_synced", ""),
                     }
                     graph.add_node(law_id, "law", node_data)
                 laws.setdefault(basis, []).append(faq_id)
