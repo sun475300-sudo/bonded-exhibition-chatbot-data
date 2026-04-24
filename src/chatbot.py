@@ -39,6 +39,7 @@ from src.vector_search import VectorSearchEngine
 from src.llm_fallback import generate_llm_response_with_disclaimer, is_llm_available
 from src.pii_redactor import PIIRedactor
 from src.prompt_defender import PromptDefender
+from src.law_content_provider import LawContentProvider
 
 logger = logging.getLogger(__name__)
 
@@ -49,6 +50,11 @@ KEYWORD_SCORE_THRESHOLD = 3
 TFIDF_SCORE_THRESHOLD = 0.1
 CLASSIFIER_CACHE_MAX_SIZE = 100
 MIN_CONCLUSION_LENGTH = 3
+# 다중 단어(공백 포함) 키워드는 더 구체적이므로 가중치를 부여
+MULTI_WORD_KEYWORD_WEIGHT = 3
+SINGLE_WORD_KEYWORD_WEIGHT = 1
+# 키워드 점수 동률 시 TF-IDF로 재정렬할 허용 차이
+KEYWORD_TIE_TOLERANCE = 1
 
 
 class BondedExhibitionChatbot:
@@ -108,6 +114,38 @@ class BondedExhibitionChatbot:
         except Exception:
             pass
 
+        # 국가법령정보센터 실시간 캐시 공급자
+        # law_api_sync 가 동기화한 최신 법령 본문을 답변 시점에 주입한다.
+        try:
+            self.law_content_provider = LawContentProvider(static_refs=self.legal_refs)
+        except Exception as e:
+            logger.warning(f"Failed to initialize LawContentProvider: {e}")
+            self.law_content_provider = None
+
+    def reload_legal_data(self) -> dict:
+        """legal_references.json 및 법령 캐시 공급자를 새로 로드한다.
+
+        법령 동기화(law_api_sync) 직후 호출하면 재시작 없이 최신 조문이
+        챗봇 답변에 반영된다.
+
+        Returns:
+            {"legal_refs": int, "provider": bool}
+        """
+        result = {"legal_refs": 0, "provider": False}
+        try:
+            self.legal_refs = load_json("data/legal_references.json").get("references", [])
+            result["legal_refs"] = len(self.legal_refs)
+        except Exception as e:
+            logger.warning(f"Failed to reload legal_references.json: {e}")
+
+        try:
+            self.law_content_provider = LawContentProvider(static_refs=self.legal_refs)
+            result["provider"] = True
+        except Exception as e:
+            logger.warning(f"Failed to rebuild LawContentProvider: {e}")
+            self.law_content_provider = None
+        return result
+
     @staticmethod
     def _normalize_faq_items(items: list[dict]) -> list[dict]:
         """FAQ 항목을 정규화하여 신/구 포맷 모두 호환되도록 한다.
@@ -158,18 +196,20 @@ class BondedExhibitionChatbot:
         """질문과 카테고리에 매칭되는 FAQ 항목을 찾는다.
 
         파이프라인:
-        1. 키워드 매칭
-        2. TF-IDF 유사도
-        3. BM25 랭킹
+        1. 키워드 매칭 (다중 단어 키워드 가중)
+        2. 동률 후보를 TF-IDF 유사도로 재정렬
+        3. TF-IDF 유사도 폴백
         4. 벡터 검색 (의미론적 매칭)
         5. LLM 폴백 (마지막 수단)
+
+        다중 단어 키워드(공백 포함)는 단일 단어 키워드보다 더 구체적이므로
+        가중치를 부여한다. 점수 동률이 발생하면 TF-IDF 코사인 유사도로
+        타이브레이크하여 가장 자연스럽게 매칭되는 항목을 선택한다.
         """
         query_lower = normalize_query(query)
-        best_match = None
-        best_score = 0
-        best_keyword_hits = 0
 
-        # 1단계: 키워드 매칭
+        # 1단계: 키워드 매칭 (다중 단어 키워드 가중)
+        scored: list[dict] = []
         for item in self.faq_items:
             score = 0
             keyword_hits = 0
@@ -177,21 +217,29 @@ class BondedExhibitionChatbot:
             if item.get("category") == category:
                 score += CATEGORY_BONUS
 
-            keywords = item.get("keywords", [])
-            for kw in keywords:
-                if kw.lower() in query_lower:
-                    score += 1
+            for kw in item.get("keywords", []):
+                if kw and kw.lower() in query_lower:
+                    score += MULTI_WORD_KEYWORD_WEIGHT if " " in kw else SINGLE_WORD_KEYWORD_WEIGHT
                     keyword_hits += 1
 
-            if score > best_score or (score == best_score and keyword_hits > best_keyword_hits):
-                best_score = score
-                best_match = item
-                best_keyword_hits = keyword_hits
+            scored.append({"item": item, "score": score, "hits": keyword_hits})
 
-        if best_score >= KEYWORD_SCORE_THRESHOLD and best_keyword_hits >= MIN_KEYWORD_HITS:
-            return best_match
+        # 점수 내림차순 + hits 내림차순으로 정렬
+        scored.sort(key=lambda c: (c["score"], c["hits"]), reverse=True)
+        top = scored[0] if scored else None
 
-        # 2단계: TF-IDF 유사도 폴백
+        if top and top["score"] >= KEYWORD_SCORE_THRESHOLD and top["hits"] >= MIN_KEYWORD_HITS:
+            # 동률에 가까운 후보(점수 차 ≤ tolerance)를 모아 TF-IDF로 재정렬
+            tied = [
+                c for c in scored
+                if c["score"] >= top["score"] - KEYWORD_TIE_TOLERANCE
+                and c["hits"] >= MIN_KEYWORD_HITS
+            ]
+            if len(tied) > 1:
+                return self._tfidf_rerank(query, tied)
+            return top["item"]
+
+        # 2단계: TF-IDF 유사도 폴백 (카테고리 필터)
         tfidf_results = self.tfidf_matcher.find_best_match(
             query, category=category, top_k=1
         )
@@ -207,8 +255,8 @@ class BondedExhibitionChatbot:
                 return tfidf_results[0]["item"]
 
         # 기존 키워드 매칭이라도 최소 기준을 충족하면 반환
-        if best_score >= 1 and best_keyword_hits >= MIN_KEYWORD_HITS:
-            return best_match
+        if top and top["score"] >= 1 and top["hits"] >= MIN_KEYWORD_HITS:
+            return top["item"]
 
         # 3단계: 벡터 검색 (의미론적 매칭)
         if self.vector_search_enabled:
@@ -223,6 +271,36 @@ class BondedExhibitionChatbot:
                 return None
 
         return None
+
+    def _tfidf_rerank(self, query: str, tied_candidates: list[dict]) -> dict:
+        """키워드 점수가 동률인 후보들을 TF-IDF 코사인 유사도로 재정렬한다.
+
+        Args:
+            query: 사용자 질문 원문.
+            tied_candidates: [{"item": FAQ, "score": int, "hits": int}, ...]
+
+        Returns:
+            가장 적합한 FAQ 항목.
+        """
+        # 카테고리 무관 전체 TF-IDF 점수 매핑
+        tfidf_results = self.tfidf_matcher.find_best_match(
+            query, category=None, top_k=len(self.faq_items)
+        )
+        # FAQ id 또는 객체 식별 기준 점수 사전
+        score_by_id: dict[str, float] = {}
+        for r in tfidf_results:
+            faq_id = r["item"].get("id", "")
+            if faq_id:
+                score_by_id[faq_id] = r["score"]
+
+        def rank_key(c: dict) -> tuple:
+            faq_id = c["item"].get("id", "")
+            tfidf_score = score_by_id.get(faq_id, 0.0)
+            # 1순위: 키워드 점수, 2순위: TF-IDF 유사도, 3순위: hits
+            return (c["score"], tfidf_score, c["hits"])
+
+        tied_candidates.sort(key=rank_key, reverse=True)
+        return tied_candidates[0]["item"]
 
     def find_matching_faq_with_llm_fallback(self, query: str, category: str) -> dict | str | None:
         """질문에 매칭되는 FAQ를 찾거나 LLM 폴백으로 답변을 생성한다.
@@ -495,10 +573,20 @@ class BondedExhibitionChatbot:
                     risk_level, policy_decision, escalation_triggered,
                 )
 
-            # 법령 가이드 요약 추출 (지식 그래프 연계)
+            # 법령 가이드 요약 추출
+            # 1) 국가법령정보센터 캐시에서 최신 본문을 우선 주입
+            # 2) 캐시 미스 시 지식 그래프/정적 요약으로 폴백
+            legal_basis_list = faq_match.get("legal_basis", [])
             legal_guide = []
-            if self.knowledge_graph:
-                for basis in faq_match.get("legal_basis", []):
+            if self.law_content_provider:
+                try:
+                    legal_guide = self.law_content_provider.build_legal_guide(legal_basis_list)
+                except Exception as e:
+                    logger.warning(f"LawContentProvider failed: {e}")
+                    legal_guide = []
+
+            if not legal_guide and self.knowledge_graph:
+                for basis in legal_basis_list:
                     law_node_id = f"law_{basis}"
                     if law_node_id in self.knowledge_graph.nodes:
                         node_data = self.knowledge_graph.nodes[law_node_id].get("data", {})
