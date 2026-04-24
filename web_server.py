@@ -1950,6 +1950,36 @@ def admin_law_sync_monitored():
     return jsonify({"laws": law_sync_manager.get_monitored_laws()})
 
 
+# --- 법령 → FAQ 자동 전파 ---
+from src.law_auto_sync import LawAutoSyncOrchestrator
+law_auto_sync = LawAutoSyncOrchestrator(sync_manager=law_sync_manager)
+
+
+@app.route("/api/admin/law-sync/full-sync", methods=["POST"])
+@jwt_auth.require_auth()
+def admin_law_full_sync():
+    """국가법령정보센터 API → legal_references → FAQ → 실행 중인 봇까지
+    한 번에 동기화한다.
+
+    옵션:
+      - reload_bot=true: 실행 중인 보세봇을 hot-reload (기본 true)
+    """
+    try:
+        payload = request.get_json(silent=True) or {}
+        do_reload = payload.get("reload_bot", True)
+
+        target_bot = None
+        if do_reload:
+            # 전역 챗봇 인스턴스가 있으면 reload
+            target_bot = globals().get("chatbot")
+
+        result = law_auto_sync.run_full_sync(chatbot=target_bot)
+        return jsonify(result)
+    except Exception as e:
+        logger.error(f"전체 법령 동기화 실패: {e}")
+        return jsonify({"error": str(e)}), 500
+
+
 @app.route("/api/admin/backup", methods=["POST"])
 @jwt_auth.require_auth()
 def admin_backup_create():
