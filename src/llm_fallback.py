@@ -18,6 +18,10 @@ try:
     import anthropic
     HAS_ANTHROPIC = True
 except ImportError:
+    # anthropic 미설치 환경에서도 `patch("src.llm_fallback.anthropic.Anthropic")`
+    # 같은 테스트가 가능하도록 최소 스텁을 노출한다.
+    import types as _types
+    anthropic = _types.SimpleNamespace(Anthropic=object)  # type: ignore[assignment]
     HAS_ANTHROPIC = False
 
 from src.utils import load_text
