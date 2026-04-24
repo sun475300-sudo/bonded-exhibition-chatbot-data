@@ -84,7 +84,7 @@ from src.smart_suggestions import SmartSuggestionEngine
 from src.entity_extractor_v2 import EntityExtractorV2, get_entity_extractor_v2
 from src.hybrid_search_v3 import HybridSearchV3
 from src.policy_engine_v2 import PolicyEngineV2, get_policy_engine_v2
-from src.response_builder_v2 import ResponseBuilderV2, get_response_builder_v2
+from src.response_builder_v2 import get_response_builder_v2
 from src.accuracy_benchmark import AccuracyBenchmark
 
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
