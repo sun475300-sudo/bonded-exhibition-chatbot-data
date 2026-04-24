@@ -39,6 +39,7 @@ from src.vector_search import VectorSearchEngine
 from src.llm_fallback import generate_llm_response_with_disclaimer, is_llm_available
 from src.pii_redactor import PIIRedactor
 from src.prompt_defender import PromptDefender
+from src.law_content_provider import LawContentProvider
 
 logger = logging.getLogger(__name__)
 
@@ -112,6 +113,38 @@ class BondedExhibitionChatbot:
             self.knowledge_graph = KnowledgeGraph.build_from_faq(self.faq_items)
         except Exception:
             pass
+
+        # 국가법령정보센터 실시간 캐시 공급자
+        # law_api_sync 가 동기화한 최신 법령 본문을 답변 시점에 주입한다.
+        try:
+            self.law_content_provider = LawContentProvider(static_refs=self.legal_refs)
+        except Exception as e:
+            logger.warning(f"Failed to initialize LawContentProvider: {e}")
+            self.law_content_provider = None
+
+    def reload_legal_data(self) -> dict:
+        """legal_references.json 및 법령 캐시 공급자를 새로 로드한다.
+
+        법령 동기화(law_api_sync) 직후 호출하면 재시작 없이 최신 조문이
+        챗봇 답변에 반영된다.
+
+        Returns:
+            {"legal_refs": int, "provider": bool}
+        """
+        result = {"legal_refs": 0, "provider": False}
+        try:
+            self.legal_refs = load_json("data/legal_references.json").get("references", [])
+            result["legal_refs"] = len(self.legal_refs)
+        except Exception as e:
+            logger.warning(f"Failed to reload legal_references.json: {e}")
+
+        try:
+            self.law_content_provider = LawContentProvider(static_refs=self.legal_refs)
+            result["provider"] = True
+        except Exception as e:
+            logger.warning(f"Failed to rebuild LawContentProvider: {e}")
+            self.law_content_provider = None
+        return result
 
     @staticmethod
     def _normalize_faq_items(items: list[dict]) -> list[dict]:
@@ -540,10 +573,20 @@ class BondedExhibitionChatbot:
                     risk_level, policy_decision, escalation_triggered,
                 )
 
-            # 법령 가이드 요약 추출 (지식 그래프 연계)
+            # 법령 가이드 요약 추출
+            # 1) 국가법령정보센터 캐시에서 최신 본문을 우선 주입
+            # 2) 캐시 미스 시 지식 그래프/정적 요약으로 폴백
+            legal_basis_list = faq_match.get("legal_basis", [])
             legal_guide = []
-            if self.knowledge_graph:
-                for basis in faq_match.get("legal_basis", []):
+            if self.law_content_provider:
+                try:
+                    legal_guide = self.law_content_provider.build_legal_guide(legal_basis_list)
+                except Exception as e:
+                    logger.warning(f"LawContentProvider failed: {e}")
+                    legal_guide = []
+
+            if not legal_guide and self.knowledge_graph:
+                for basis in legal_basis_list:
                     law_node_id = f"law_{basis}"
                     if law_node_id in self.knowledge_graph.nodes:
                         node_data = self.knowledge_graph.nodes[law_node_id].get("data", {})

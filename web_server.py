@@ -1922,13 +1922,25 @@ def admin_law_sync_check():
 @app.route("/api/admin/law-sync/sync", methods=["POST"])
 @jwt_auth.require_auth()
 def admin_law_sync_apply():
-    """법령 변경을 확인하고 legal_references.json을 자동 업데이트한다."""
+    """법령 변경을 확인하고 legal_references.json을 자동 업데이트한다.
+
+    변경이 있으면 챗봇의 in-memory 법령 데이터를 즉시 재로드하여
+    재시작 없이 최신 법령 본문이 답변에 반영되도록 한다.
+    """
     try:
         check_result = law_sync_manager.check_all()
         update_result = law_sync_manager.update_legal_references()
+        reload_result = None
+        if check_result.get("changes_detected", 0) > 0 or update_result.get("updated", 0) > 0:
+            try:
+                reload_result = chatbot.reload_legal_data()
+            except Exception as e:
+                logger.warning(f"Chatbot legal reload failed: {e}")
+                reload_result = {"error": str(e)}
         return jsonify({
             "check": check_result,
             "update": update_result,
+            "chatbot_reloaded": reload_result,
         })
     except Exception as e:
         logger.error(f"법령 동기화 실패: {e}")
