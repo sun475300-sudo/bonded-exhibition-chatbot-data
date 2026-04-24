@@ -13,7 +13,7 @@ class PIIRedactor:
 
     def __init__(self, enabled: bool = True):
         """초기화.
-        
+
         Args:
             enabled: PII 모듈 활성화 여부
         """
@@ -23,7 +23,13 @@ class PIIRedactor:
         self.patterns = {
             "jumin": re.compile(r'\b\d{2}(?:0[1-9]|1[0-2])(?:0[1-9]|[1,2][0-9]|3[0,1])[- ]?[1-4]\d{6}\b'),
             "email": re.compile(r'[a-zA-Z0-9_.+-]+@[a-zA-Z0-9-]+\.[a-zA-Z0-9-.]+'),
-            "phone": re.compile(r'\b01[016789][-.\s]?\d{3,4}[-.\s]?\d{4}\b|\b0[2-9]\d{0,1}[-.\s]?\d{3,4}[-.\s]?\d{4}\b'),
+            # `\b` 뒤에 한글이 오면 Unicode word boundary 가 성립하지 않아
+            # 매칭이 실패한다. `(?!\d)` 음의 전방탐색으로 교체해 추가 숫자가
+            # 이어지지 않을 때만 매칭되도록 수정.
+            "phone": re.compile(
+                r'(?<!\d)01[016789][-.\s]?\d{3,4}[-.\s]?\d{4}(?!\d)'
+                r'|(?<!\d)0[2-9]\d{0,1}[-.\s]?\d{3,4}[-.\s]?\d{4}(?!\d)'
+            ),
             "credit_card": re.compile(r'\b(?:[0-9]{4}[-.\s]?){3}[0-9]{3,4}\b')
         }
 

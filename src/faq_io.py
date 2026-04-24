@@ -5,7 +5,6 @@ FAQ items in CSV and JSON formats, with validation and merge strategies.
 """
 
 import csv
-import io
 import json
 import os
 from datetime import datetime, timezone

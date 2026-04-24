@@ -252,7 +252,6 @@ class HealthMonitor:
 
         except ImportError:
             # Windows 등 resource 모듈 미지원
-            import sys
             details = {"note": "resource 모듈 미지원 플랫폼"}
             return self._make_result("healthy", "메모리 점검 스킵 (플랫폼 미지원)", details)
         except Exception as e:
@@ -372,7 +371,6 @@ class HealthMonitor:
         Returns:
             dict: Python 버전, OS, 업타임 등
         """
-        import sys
 
         uptime_seconds = time.time() - self._start_time
 
