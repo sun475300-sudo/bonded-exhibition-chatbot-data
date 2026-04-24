@@ -15,8 +15,6 @@ import sys
 import time
 from datetime import datetime
 from collections import defaultdict
-from functools import wraps
-import json as json_module
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
@@ -59,7 +57,7 @@ from src.tenant_manager import TenantManager
 from src.webhook_manager import WebhookManager
 from src.audit_logger import AuditLogger
 from src.alert_center import AlertCenter, AlertRuleEngine
-from src.profiler import Profiler, RequestProfiler, ComponentBenchmark
+from src.profiler import RequestProfiler, ComponentBenchmark
 from src.health_monitor import HealthMonitor
 from src.i18n import I18nManager
 from src.db_migration import MigrationManager
@@ -68,23 +66,23 @@ from src.user_recommender import UserRecommender
 from src.flow_analyzer import FlowAnalyzer
 from src.sentiment_analyzer import SentimentAnalyzer
 from src.question_cluster import QuestionClusterer, DuplicateDetector
-from src.task_scheduler import TaskScheduler, create_default_scheduler
+from src.task_scheduler import create_default_scheduler
 from src.knowledge_graph import KnowledgeGraph
 from src.template_engine import TemplateEngine, ResponseFormatter
 from src.context_memory import ContextMemory, ConversationMemoryManager
-from src.conversation_manager_v3 import ConversationManagerV3, TopicTracker
+from src.conversation_manager_v3 import ConversationManagerV3
 from src.user_segment import UserSegmenter
 from src.domain_config import DomainConfig, DomainInitializer
 from src.utils import load_json
 from src.api_gateway import APIGateway, PaginationHelper, SortHelper
 from src.quality_scorer import ResponseQualityScorer, QualityReport
 from src.conversation_analytics import ConversationAnalytics
-from src.error_recovery import ErrorRecovery, CircuitBreakerOpenError
+from src.error_recovery import ErrorRecovery
 from src.smart_suggestions import SmartSuggestionEngine
-from src.entity_extractor_v2 import EntityExtractorV2, get_entity_extractor_v2
+from src.entity_extractor_v2 import get_entity_extractor_v2
 from src.hybrid_search_v3 import HybridSearchV3
-from src.policy_engine_v2 import PolicyEngineV2, get_policy_engine_v2
-from src.response_builder_v2 import ResponseBuilderV2, get_response_builder_v2
+from src.policy_engine_v2 import get_policy_engine_v2
+from src.response_builder_v2 import get_response_builder_v2
 from src.accuracy_benchmark import AccuracyBenchmark
 
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
@@ -1108,7 +1106,6 @@ def faq_reload():
         # 6. SmartSuggestionEngine 재구축
         from src.knowledge_graph import KnowledgeGraph
         _new_kg = KnowledgeGraph.build_from_faq(chatbot.faq_items, chatbot.legal_refs)
-        from src.smart_suggestions import SmartSuggestionEngine
         smart_suggestion_engine.__init__(
             faq_items=chatbot.faq_items,
             knowledge_graph=_new_kg,
@@ -1903,7 +1900,7 @@ def admin_law_updates_acknowledge():
 
 
 # --- 국가법령정보센터 API 동기화 ---
-from src.law_api_sync import LawSyncManager
+from src.law_api_sync import LawSyncManager  # noqa: E402
 law_sync_manager = LawSyncManager()
 
 
@@ -1948,6 +1945,36 @@ def admin_law_sync_history():
 def admin_law_sync_monitored():
     """모니터링 대상 법령 목록을 조회한다."""
     return jsonify({"laws": law_sync_manager.get_monitored_laws()})
+
+
+# --- 법령 → FAQ 자동 전파 ---
+from src.law_auto_sync import LawAutoSyncOrchestrator  # noqa: E402
+law_auto_sync = LawAutoSyncOrchestrator(sync_manager=law_sync_manager)
+
+
+@app.route("/api/admin/law-sync/full-sync", methods=["POST"])
+@jwt_auth.require_auth()
+def admin_law_full_sync():
+    """국가법령정보센터 API → legal_references → FAQ → 실행 중인 봇까지
+    한 번에 동기화한다.
+
+    옵션:
+      - reload_bot=true: 실행 중인 보세봇을 hot-reload (기본 true)
+    """
+    try:
+        payload = request.get_json(silent=True) or {}
+        do_reload = payload.get("reload_bot", True)
+
+        target_bot = None
+        if do_reload:
+            # 전역 챗봇 인스턴스가 있으면 reload
+            target_bot = globals().get("chatbot")
+
+        result = law_auto_sync.run_full_sync(chatbot=target_bot)
+        return jsonify(result)
+    except Exception as e:
+        logger.error(f"전체 법령 동기화 실패: {e}")
+        return jsonify({"error": str(e)}), 500
 
 
 @app.route("/api/admin/backup", methods=["POST"])
@@ -3636,7 +3663,7 @@ def get_domain_template_api():
 
 
 # --- Chart Data API ---
-from src.chart_data import ChartDataGenerator
+from src.chart_data import ChartDataGenerator  # noqa: E402
 chart_data_gen = ChartDataGenerator(
     logger_db=chat_logger,
     feedback_db=feedback_manager,
@@ -3654,7 +3681,6 @@ def chart_categories():
 @app.route("/api/admin/charts/trends", methods=["GET"])
 @jwt_auth.require_auth()
 def chart_trends():
-    metric = request.args.get("metric", "queries")
     days = int(request.args.get("days", 30))
     return jsonify(chart_data_gen.daily_query_trend(days=days))
 
@@ -4077,7 +4103,7 @@ def main():
     parser.add_argument("--port", type=int, default=5000)
     parser.add_argument("--host", type=str, default="0.0.0.0")
     args = parser.parse_args()
-    
+
     logger.info(f"Starting web server on {args.host}:{args.port}")
     app.run(host=args.host, port=args.port, debug=False)
 

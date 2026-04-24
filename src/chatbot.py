@@ -108,6 +108,65 @@ class BondedExhibitionChatbot:
         except Exception:
             pass
 
+    def reload_data(self) -> dict:
+        """FAQ·법령 참고자료를 디스크에서 다시 읽어 실행 중인 봇에 반영한다.
+
+        국가법령정보센터 API 동기화 등으로 data/faq.json 또는
+        data/legal_references.json이 갱신된 뒤 호출하면
+        재시작 없이 새 내용으로 응답한다.
+
+        Returns:
+            reload 결과 요약 dict.
+        """
+        result: dict = {
+            "faq_items": 0,
+            "legal_refs": 0,
+            "tfidf_rebuilt": False,
+            "vector_rebuilt": False,
+        }
+
+        self.faq_data = load_json("data/faq.json")
+        self.faq_items = self._normalize_faq_items(self.faq_data.get("items", []))
+        result["faq_items"] = len(self.faq_items)
+
+        try:
+            self.legal_refs = load_json("data/legal_references.json").get(
+                "references", []
+            )
+            result["legal_refs"] = len(self.legal_refs)
+        except Exception as e:
+            logger.warning(f"legal_references 재로드 실패: {e}")
+
+        try:
+            self.tfidf_matcher = TFIDFMatcher(self.faq_items)
+            result["tfidf_rebuilt"] = True
+        except Exception as e:
+            logger.warning(f"TF-IDF 재구축 실패: {e}")
+
+        self.related_faq_finder = RelatedFAQFinder(self.faq_items)
+        self._classifier_cache.clear()
+
+        if self.vector_search_enabled:
+            try:
+                self.vector_search = VectorSearchEngine(self.faq_items)
+                result["vector_rebuilt"] = True
+            except Exception as e:
+                logger.warning(f"벡터 인덱스 재구축 실패: {e}")
+
+        try:
+            if self.knowledge_graph is not None:
+                from src.knowledge_graph import KnowledgeGraph
+                self.knowledge_graph = KnowledgeGraph.build_from_faq(self.faq_items)
+        except Exception as e:
+            logger.warning(f"지식 그래프 재구축 실패: {e}")
+
+        logger.info(
+            "Chatbot reload: faq=%s legal_refs=%s",
+            result["faq_items"],
+            result["legal_refs"],
+        )
+        return result
+
     @staticmethod
     def _normalize_faq_items(items: list[dict]) -> list[dict]:
         """FAQ 항목을 정규화하여 신/구 포맷 모두 호환되도록 한다.
@@ -654,7 +713,6 @@ class BondedExhibitionChatbot:
 
     def _build_escalation_response_from_policy(self, policy_decision: dict) -> str:
         """정책 평가 결과로부터 에스컬레이션 응답을 생성한다."""
-        escalation_target = policy_decision.get("escalation_target")
         risk_level = policy_decision.get("risk_level", "high")
         disclaimers = policy_decision.get("disclaimers", [])
 

@@ -2,8 +2,12 @@
 
 import pytest
 
-# VectorSearchEngine은 sentence-transformers가 설치되었을 때만 테스트
+# VectorSearchEngine은 sentence-transformers와 numpy가 설치되었을 때만 테스트
+# (클래스 import 자체는 성공하지만 __init__에서 ImportError가 발생하므로
+# 의존 패키지 import 가능 여부로 판단한다)
 try:
+    import numpy  # noqa: F401
+    import sentence_transformers  # noqa: F401
     from src.vector_search import VectorSearchEngine
     HAS_EMBEDDINGS = True
 except ImportError:

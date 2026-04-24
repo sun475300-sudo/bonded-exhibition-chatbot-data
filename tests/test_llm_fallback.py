@@ -276,9 +276,11 @@ class TestLLMFallbackProvider:
     @patch.dict("os.environ", {"CHATBOT_LLM_API_KEY": "test-key"})
     def test_provider_api_error_handling(self):
         """API 오류 처리 테스트."""
+        # anthropic.APIError 생성이 필요한 테스트이므로 패키지가 없으면 skip
+        anthropic_pkg = pytest.importorskip("anthropic")
         with patch("src.llm_fallback.HAS_ANTHROPIC", True):
             with patch("src.llm_fallback.anthropic.Anthropic") as mock_anthropic:
-                import anthropic
+                anthropic = anthropic_pkg
 
                 mock_client = MagicMock()
                 mock_anthropic.return_value = mock_client
