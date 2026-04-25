@@ -17,10 +17,12 @@ class PromptDefender:
         # XSS, SQLi, 시스템 프롬프트 유출 시도 패턴
         self.blacklist_patterns = [
             re.compile(r'(?i)<script\b[^<]*(?:(?!<\/script>)<[^<]*)*<\/script>'),  # XSS
-            re.compile(r'(?i)(?:select\|insert\|update\|delete\|drop\|truncate\|union\|exec)\s+.*\s+(?:from\|into\|table)', re.IGNORECASE), # SQLi (기본 형태)
-            re.compile(r'(?i)(--|\bDELETE\b|\bDROP\b|\bINSERT\b|\bUPDATE\b)\s+'), # SQLi (명령어)
-            re.compile(r'(?i)(ignore previous instructions|너의 지시사항|이전 프롬프트 무시|system prompt|jailbreak|DAN\b|개발자 모드)'), # LLM Prompt Injection
-            re.compile(r'(?i)(<\s*(?:iframe|object|embed|applet|meta)[^>]*>)'), # HTML injection
+            re.compile(r'(?i)\b(?:select|union)\b\s+[\w*,\s]+\bfrom\b'),  # SELECT/UNION ... FROM
+            re.compile(r'(?i)\b(?:drop|truncate|alter|create)\s+(?:table|database|index|view|schema)\b'),  # DDL
+            re.compile(r'(?i)\binsert\s+into\b|\bupdate\s+\w+\s+set\b|\bdelete\s+from\b|\bexec(?:ute)?\s*\('),  # DML/exec
+            re.compile(r"(?i)('|\")\s*or\s+\1?\s*\d+\s*=\s*\d+|\b\d+\s*=\s*\d+\s*--|--\s*$|/\*.*?\*/|;\s*--"),  # tautology / 주석 인젝션
+            re.compile(r'(?i)(ignore previous instructions|너의 지시사항|이전 프롬프트 무시|system prompt|jailbreak|\bDAN\b|개발자 모드)'),  # LLM Prompt Injection
+            re.compile(r'(?i)<\s*(?:iframe|object|embed|applet|meta)[^>]*>'),  # HTML injection
         ]
 
     def is_malicious(self, text: str) -> bool:
