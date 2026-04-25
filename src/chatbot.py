@@ -108,6 +108,15 @@ class BondedExhibitionChatbot:
         except Exception:
             pass
 
+        # 국가법령정보센터 캐시 브리지: 응답에 최신 조문 본문/동기화 시각을 노출.
+        # 캐시 조회만 수행하므로 외부 API 호출 비용은 발생하지 않는다.
+        self.law_cache = None
+        try:
+            from src.law_cache import get_law_cache_bridge
+            self.law_cache = get_law_cache_bridge()
+        except Exception as e:
+            logger.warning("LawCacheBridge unavailable: %s", e)
+
     @staticmethod
     def _normalize_faq_items(items: list[dict]) -> list[dict]:
         """FAQ 항목을 정규화하여 신/구 포맷 모두 호환되도록 한다.
@@ -525,10 +534,24 @@ class BondedExhibitionChatbot:
                     risk_level, policy_decision, escalation_triggered,
                 )
 
-            # 법령 가이드 요약 추출 (지식 그래프 연계)
-            legal_guide = []
+            # 법령 가이드 요약 추출.
+            # 1) 국가법령정보센터 캐시(LawCacheBridge)에 저장된 최신 본문이 있으면
+            #    "{조문} (YYYY-MM-DD 동기화 기준): {요약}" 형태로 우선 노출한다.
+            # 2) 캐시가 비어있는 항목은 정적 지식 그래프 요약으로 폴백한다.
+            legal_basis_list = faq_match.get("legal_basis", [])
+            legal_guide: list[str] = []
+            covered_by_cache: set[str] = set()
+            if self.law_cache:
+                cache_entries = self.law_cache.build_legal_guide_entries(legal_basis_list)
+                legal_guide.extend(cache_entries)
+                # cache_entries는 "{basis} (...)" 형태이므로 prefix로 매칭한다.
+                for basis in legal_basis_list:
+                    if any(entry.startswith(basis) for entry in cache_entries):
+                        covered_by_cache.add(basis)
             if self.knowledge_graph:
-                for basis in faq_match.get("legal_basis", []):
+                for basis in legal_basis_list:
+                    if basis in covered_by_cache:
+                        continue
                     law_node_id = f"law_{basis}"
                     if law_node_id in self.knowledge_graph.nodes:
                         node_data = self.knowledge_graph.nodes[law_node_id].get("data", {})
