@@ -11,6 +11,7 @@ TF-IDF와 BM25 매칭 실패 시 Claude API를 호출하여 답변을 생성하�
 """
 
 import os
+import sys
 import time
 from collections import OrderedDict
 
@@ -19,16 +20,28 @@ try:
     HAS_ANTHROPIC = True
 except ImportError:
     # anthropic 미설치 환경에서도 모듈 임포트가 가능해야 한다.
-    # 테스트는 `src.llm_fallback.anthropic.Anthropic` 같은 경로를 patch 하므로
-    # 동일한 형태의 placeholder 를 노출한다.
-    import types as _types
+    # 테스트는 `src.llm_fallback.anthropic.Anthropic` 같은 경로를 patch 하거나
+    # `import anthropic` 을 호출할 수 있으므로, sys.modules 에도 stub 을
+    # 등록해 양쪽 경로 모두 동작하도록 한다.
+    from types import ModuleType
 
-    anthropic = _types.SimpleNamespace(
-        Anthropic=type("_StubAnthropic", (), {}),
-        APIError=Exception,
-        RateLimitError=Exception,
-        AuthenticationError=Exception,
-    )
+    mock_anthropic = ModuleType("anthropic")
+
+    class _StubAnthropicClient:
+        def __init__(self, *args, **kwargs):
+            pass
+
+    class _StubAPIError(Exception):
+        def __init__(self, *args, **kwargs):
+            super().__init__(*args)
+
+    mock_anthropic.Anthropic = _StubAnthropicClient
+    mock_anthropic.APIError = _StubAPIError
+    mock_anthropic.RateLimitError = _StubAPIError
+    mock_anthropic.AuthenticationError = _StubAPIError
+    sys.modules["anthropic"] = mock_anthropic
+
+    anthropic = mock_anthropic
     HAS_ANTHROPIC = False
 
 from src.utils import load_text
@@ -101,7 +114,8 @@ class ResponseCache:
 
         # TTL 확인
         if now - timestamp > self.ttl_seconds:
-            del self.cache[key]
+            # OrderedDict에서 키 삭제
+            self.cache.pop(key)
             return None
 
         # 최근 사용 항목으로 이동 (LRU)

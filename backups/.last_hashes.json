@@ -1,16 +1,19 @@
 {
   "data/ab_tests.db": {
-    "size": 32768,
-    "sha256": "dc93391d0e8eee88082370e251411f031d0a8b5e4eec11c337dbab70cee67ddd"
+    "size": 40960,
+    "sha256": "a4c846e23d94a87ffe8c682a78e2e18ebf1121b6a6ef17d4e5a18c07478f3140"
   },
   "data/alerts.db": {
-    "size": 24576,
-    "sha256": "b6f1a435406c1bfe1f56141566f69ebc624791964d81f3a291436ea90f4283c5"
+    "size": 28672,
+    "sha256": "c6db0165e4a47940a5d7e4bdfdf4183849c6028d2bf5fa72357bd0a92df10a27"
   },
   "data/audit.db": {
-<<<<<<< Updated upstream
-    "size": 626688,
-    "sha256": "12f41036f9f65c3fa5b22c8fd2ac3405efc0772643a5f30cfba23ce0ca1dbaa8"
+    "size": 737280,
+    "sha256": "5a3725308582f7b45b48e3c13fde8fdbbb880125c3b402492c8d49cdb05737bd"
+  },
+  "data/conversation_v3.db": {
+    "size": 20480,
+    "sha256": "220fba2d5171b1eefcd17c4e9af32bd4c33c69c968629dc67acd86b7a5b10487"
   },
   "data/escalation_rules.json": {
     "size": 2262,
@@ -19,104 +22,57 @@
   "data/faq.json": {
     "size": 38612,
     "sha256": "c7037025bfd1ebeaf1a4a50650c8a444b31c3ed628447d11863647ad6b459d6a"
-=======
-    "size": 507904,
-    "sha256": "d80daec60bbfc3540b74f32ab70ff5a215f2d0167d1bbed77f61a7d80e206748"
-  },
-  "data/escalation_rules.json": {
-    "size": 2302,
-    "sha256": "6b9db0b6f67fa891a385bcdd158add29ce838895c9b541994b7b7cf74ca6b012"
-  },
-  "data/faq.json": {
-    "size": 333172,
-    "sha256": "c21e76be721122d07ba92967f76f6dbbe60c6a4b8a23fc37010dafb730a438c5"
->>>>>>> Stashed changes
   },
   "data/faq_pipeline.db": {
     "size": 12288,
     "sha256": "77bcb3bcfe128807ea3dae1589e5623616654e891ae94cd12a1796833f18c9eb"
   },
   "data/faq_snapshots.db": {
-<<<<<<< Updated upstream
-    "size": 7643136,
-    "sha256": "1440391d1248201a3291309c0c0f411b5180eb20f84be75b7bdc33131f2fffdc"
-=======
-    "size": 6897664,
-    "sha256": "332c29ba0b3aefdf94f4fc8b006a533483e38b82789860a13276a667e1ad1886"
->>>>>>> Stashed changes
+    "size": 9449472,
+    "sha256": "d70678742f78377f081052a595e2c913bd6dd8716a847f65afb563ef29ef152a"
+  },
+  "data/law_sync.db": {
+    "size": 20480,
+    "sha256": "52cafba392c3dde939213809403fe8b0e383266ecbc94690d7e920bebbc3245a"
   },
   "data/law_versions.db": {
     "size": 20480,
     "sha256": "6bd27f22aeba25f6b043b168413b23f275a0406ca9997e8bd6c483ad9761efa2"
   },
   "data/legal_references.json": {
-<<<<<<< Updated upstream
     "size": 3792,
     "sha256": "f06b07261036a8e8e68069b51c4b50a3c8f0287a38d4fa3294d5926ba16fb817"
   },
   "data/memory.db": {
-    "size": 241664,
-    "sha256": "090536d005f5c7cb74c86db5b9fb7c874b6ba70aa8efd61b36803382d4126e57"
-=======
-    "size": 3875,
-    "sha256": "10e66dd63d992fa02487a9e6dbe29391ddcd9b257c575a5ac4a4b79b6276264b"
-  },
-  "data/memory.db": {
-    "size": 176128,
-    "sha256": "52ce18de78637755545ee55277d672735aa21b298d7de7e4ec66d4600d977fa3"
->>>>>>> Stashed changes
+    "size": 315392,
+    "sha256": "602216f042af24b2ef67c4f919f914ac729438718c59f8527cbd02dcef4a8f0b"
   },
   "data/migrations.db": {
     "size": 8192,
     "sha256": "62b0e0c80d5b9ab7348a33538b1bcd04661b39da44c434f03273f5546c221428"
   },
   "data/scheduler.db": {
-<<<<<<< Updated upstream
-    "size": 36864,
-    "sha256": "5c88afedd6214763906cd7dba3c639c4da93671e77d9a821a3a88b40068c5ab0"
+    "size": 40960,
+    "sha256": "84ef816b4e2e151e185571db66963db5ca1098e7b3bd92e2d663fa1f984e3922"
   },
   "data/segments.db": {
-    "size": 237568,
-    "sha256": "22cee5db709877e8ae62ee16a03eb490423a513a683bc6c09e782ceac161d85d"
+    "size": 290816,
+    "sha256": "03359903272f52ad062848dd580dadfb84f0ededfdc4b8fd6a3b11b034a18e9a"
   },
   "data/sentiment.db": {
-    "size": 5287936,
-    "sha256": "f90761a7cd8a18942bc754eb9cac7d7f0e130ad59922148577f4da76387f39c1"
+    "size": 6610944,
+    "sha256": "8b70ff178a85d6421ce47ec0675a47ce2de955d7eb75109d9490ed95d04e19ac"
   },
   "data/tenants.db": {
-=======
->>>>>>> Stashed changes
-    "size": 28672,
-    "sha256": "a8bc725cdec47821c32a6fdca0fec1fe1295adbd650dc2b86eb28fae328a884b"
-  },
-<<<<<<< Updated upstream
-  "data/user_profiles.db": {
-    "size": 176128,
-    "sha256": "eb1adfb627d6c5086d713fe3d51a3435e2cb5f6ddeb85e746983bb89fc12ecdb"
-  },
-  "data/webhooks.db": {
-    "size": 3321856,
-    "sha256": "e4eb62129d98b435faf21a9ca440f18c26f113bb5cd2f9316645dc6bda53e260"
-=======
-  "data/segments.db": {
-    "size": 167936,
-    "sha256": "803240a617859a8a2520267b960b0d5c9af03c2fda9ed08d03c313459850f8cf"
-  },
-  "data/sentiment.db": {
-    "size": 3801088,
-    "sha256": "70f69041090d5c469bad289885c9983517368a1791d33f1483209dae69dcb74e"
-  },
-  "data/tenants.db": {
-    "size": 28672,
-    "sha256": "29427dc17f6fd8bd884a2f5fde617457993d30cc5b163769be07fb557c5e40a4"
+    "size": 40960,
+    "sha256": "7978bda4fcd2bb427756e384ca8707461a261127099125ca481c90f42f3d744c"
   },
   "data/user_profiles.db": {
-    "size": 139264,
-    "sha256": "e3c12c2c2d41a67f1443fdc2e96127dcf487ba007c3ca77304f203e1f15561ad"
+    "size": 208896,
+    "sha256": "586a46136c5ddac5ee0e0d157a288873515557ead1db8a4a30dd5c2ce82ea62f"
   },
   "data/webhooks.db": {
-    "size": 2289664,
-    "sha256": "7d303d5f5c1adf1c7b43f5ad3d5b7c47b77ae959f81e26063e589319f54e826e"
->>>>>>> Stashed changes
+    "size": 4915200,
+    "sha256": "4e8a33f2d1f37e005a09be8f07ee4d81004ebc15b184129213be634e630cae28"
   }
 }
