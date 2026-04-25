@@ -74,7 +74,7 @@ class LawAPIClient:
             req = Request(url, headers={"User-Agent": "BondedExhibitionChatbot/1.0"})
             with urlopen(req, timeout=30) as resp:
                 return resp.read().decode("utf-8")
-        except URLError as e:
+        except URLError:
             return None
 
     def get_article_text(self, xml_data, article_no):

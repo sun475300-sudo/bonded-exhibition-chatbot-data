@@ -13,7 +13,7 @@ class PIIRedactor:
 
     def __init__(self, enabled: bool = True):
         """초기화.
-        
+
         Args:
             enabled: PII 모듈 활성화 여부
         """

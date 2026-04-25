@@ -13,7 +13,6 @@ TF-IDF와 BM25 매칭 실패 시 Claude API를 호출하여 답변을 생성하�
 import os
 import time
 from collections import OrderedDict
-from datetime import datetime, timedelta
 
 try:
     import anthropic
@@ -201,7 +200,7 @@ class LLMFallbackProvider:
                     legal_basis.extend(bases)
 
             if legal_basis:
-                prompt += f"\n법적 근거:\n"
+                prompt += "\n법적 근거:\n"
                 for basis in legal_basis[:5]:  # 최대 5개
                     prompt += f"- {basis}\n"
 
@@ -265,7 +264,7 @@ class LLMFallbackProvider:
 
             return response
 
-        except anthropic.APIError as e:
+        except anthropic.APIError:
             # API 오류는 로깅하고 None 반환
             return None
         except Exception:

@@ -6,7 +6,6 @@
 """
 
 import re
-import unicodedata
 
 
 # 지원 언어 코드
