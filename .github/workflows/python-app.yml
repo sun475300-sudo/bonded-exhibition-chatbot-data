@@ -36,4 +36,13 @@ jobs:
         flake8 . --count --exit-zero --max-complexity=10 --max-line-length=127 --statistics
     - name: Test with pytest
       run: |
-        pytest
+        set -o pipefail
+        pytest -v --tb=short -ra 2>&1 | tee pytest-output.log
+
+    - name: 실패 로그 요약 (Job Summary 게시)
+      if: failure()
+      run: |
+        echo "## pytest 실패 요약" >> "$GITHUB_STEP_SUMMARY"
+        echo '```' >> "$GITHUB_STEP_SUMMARY"
+        tail -n 200 pytest-output.log >> "$GITHUB_STEP_SUMMARY" || true
+        echo '```' >> "$GITHUB_STEP_SUMMARY"
