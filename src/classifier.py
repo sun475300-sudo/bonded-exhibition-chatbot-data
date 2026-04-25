@@ -12,75 +12,125 @@ logger = logging.getLogger(__name__)
 
 CATEGORY_KEYWORDS = {
     "GENERAL": [
-        "보세전시장", "보세구역", "제도", "정의", "개념", "뜻", "무엇",
-        "어떤 곳", "어떤곳", "보세 전시장", "보세창고", "차이", "다른 점",
-        "내국물품", "국산", "비교", "구분", "이용", "누가", "자격"
+        "보세전시장이 무엇", "보세전시장 정의", "보세전시장 뜻이",
+        "보세전시장의 개념", "보세전시장 개념", "보세전시장이란",
+        "보세창고", "보세창고와", "보세전시장과 보세창고",
+        "보세 전시장", "차이점", "다른가요", "다른 점",
+        "내국물품도 전시", "내국물품 전시", "내국물품",
+        "이용 자격", "누가 이용", "이용할 수 있", "이용 가능",
+        "행사 주최", "행사를 주최", "행사 준비", "행사 개최",
+        "주최하려면", "운영인 자격", "운영인 요건",
+        "운영인 자격 요건"
     ],
     "LICENSE": [
-        "특허", "운영", "설치", "특허기간", "특허신청",
-        "특허장소", "운영인", "설치특허", "갱신", "연장", "변경",
-        "특허 연장", "기간 연장"
+        "특허기간", "특허 기간", "특허신청", "특허 신청", "특허장소",
+        "특허 갱신", "특허 연장", "기간 연장", "특허 변경",
+        "특허 받으려면", "특허를 받", "특허 어디",
+        "특허 수수료", "특허 신청 비용", "특허 비용",
+        "특허 취소 사유", "특허가 취소", "취소될 수 있",
+        "설치·운영 특허", "설치 운영 특허",
+        "특허 신청 수수료",
+        "특허를 갱신", "특허를 연장", "특허 연장 가능"
     ],
     "IMPORT_EXPORT": [
         "반입", "반출", "반출입", "물품검사",
         "들여오", "내보내", "가져오", "꺼내", "재반출", "반송",
-        "돌려보내", "잔류", "남은 물품", "미반출",
-        "해외로", "세관 검사", "반입 검사"
+        "돌려보내", "잔류", "남은 물품", "물품이 남", "남으면",
+        "전시 종료 후 물품", "전시 종료 후 잔류", "물품 남",
+        "미반출", "해외로", "세관 검사", "반입 검사", "반입 물품",
+        "보세운송", "다른 보세전시장", "보세전시장 간",
+        "가액 신고", "물품 가액", "처리하나요"
     ],
     "EXHIBITION": [
-        "전시", "장치", "진열", "디스플레이", "전시회",
-        "박람회", "전람회", "시연", "데모", "시범", "체험",
-        "사용 범위", "전시 목적", "전시 가능"
+        "진열", "디스플레이", "시연", "데모", "시범", "체험",
+        "사용 범위", "전시 목적", "전시 가능", "장치된 물품",
+        "장치된 외국물품", "전시 기간 중", "물품 교체", "전시물 교체",
+        "전시물을 중간에 바꿀", "전시물 중간에", "중간에 바꿀",
+        "전시물 바꿀", "전시 교체",
+        "전시장 내 보관", "보관 주의사항", "전시장 보관", "보관 시",
+        "전시 촬영", "촬영 홍보", "전시장에서 촬영", "전시장 촬영",
+        "전시장 홍보", "홍보 활동", "전시할 수 있", "전시 물품 제한",
+        "전시할 수 있는 물품", "장치된 물품 사용", "사용 어디까지",
+        "어디까지 사용", "장치된 물품 어디"
     ],
     "SALES": [
-        "판매", "직매", "현장판매", "현장 판매", "인도", "구매",
+        "판매", "직매", "현장판매", "현장 판매", "구매",
         "매매", "사다", "팔다", "팔 수", "물건 팔", "살 수",
-        "현장에서 판매", "바로 판매",
-        "계약", "주문", "인도 시점", "통관 후"
+        "현장에서 판매", "바로 판매", "현장 직매",
+        "판매 계약", "주문 접수", "통관 전 인도", "통관 전 판매",
+        "판매 대금", "결제 대금", "수금", "정산 대금", "결제",
+        "수입면허 신청 절차", "판매 전 수입면허", "수입면허 신청",
+        "계약만 체결", "계약만", "계약 체결", "체결하고",
+        "인도는 나중에", "인도 나중에", "나중에 인도", "나중에 통관"
     ],
     "SAMPLE": [
-        "견본품", "샘플", "견본", "홍보용", "시료", "무료 배포",
-        "무료배포", "나눠주", "견본품 관세", "견본품 세금", "견본품 과세"
+        "견본품", "샘플", "견본", "홍보용 샘플", "시료",
+        "무료 배포", "무료배포", "나눠주",
+        "견본품 관세", "견본품 세금", "견본품 과세",
+        "견본품 수량", "견본품 반환", "샘플 반납"
     ],
     "FOOD_TASTING": [
-        "시식", "식품", "음식", "요건확인", "세관장확인",
-        "식약처", "검역", "위생", "시식용", "잔량", "폐기",
-        "남은 식품"
+        "시식", "시식용", "시식 식품", "시식 행사", "시식용 식품",
+        "음식", "요건확인 생략", "세관장확인",
+        "식약처", "검역", "위생",
+        "시식 잔량", "시식 폐기", "남은 시식 식품", "남은 시식",
+        "시식용 한글", "한글 표시 라벨", "한글 라벨",
+        "행사 후 처리", "시식 처리", "시식용 잔량", "시식 수량",
+        "시식 식품 행사", "시식용 식품 수량"
     ],
     "DOCUMENTS": [
         "서류", "신고서", "신청서", "구비서류", "제출", "양식",
-        "서식", "첨부", "문서", "반출입신고서", "허가 신청"
+        "서식", "첨부서류", "문서", "어떤 서류", "서류가 필요",
+        "필요한 서류", "필요 서류", "송장", "인보이스",
+        "반출입신고서 양식", "특허 신청 서류", "특허 신청 시 서류",
+        "특허 신청 구비서류", "수입면허 서류", "수입면허 신청 서류",
+        "수입신고서", "수입신고서 외",
+        "운영 종료 보고", "결과 보고", "보고서"
     ],
     "PENALTIES": [
-        "벌칙", "제재", "과태료", "벌금", "처벌", "위반", "처분",
-        "불이익", "과징금", "무허가", "밀수", "특허 취소",
-        "업무 정지", "의무 위반", "허가 없이", "면허 없이",
-        "어떻게 되나", "처벌받", "걸리면"
+        "벌칙", "제재", "과태료", "벌금", "처벌", "처분",
+        "불이익", "과징금", "무허가", "밀수", "밀수출입",
+        "허가 없이 반출", "허가 없이 물품을 반출", "허가 없이 물품",
+        "면허 없이 사용", "면허 없이 판매", "면허 없이 판매용",
+        "운영인 의무 위반", "운영인 의무위반",
+        "업무 정지", "처벌받", "걸리면", "위반시", "위반하면", "위반 시"
     ],
     "CONTACT": [
-        "문의", "전화", "연락처", "담당", "어디에", "누구에게",
-        "상담", "고객지원", "기술지원", "보세산업과", "어디",
-        "담당 부서", "소관"
+        "문의", "전화", "연락처", "어디에 연락", "어디로 연락",
+        "어디로 하나요", "누구에게",
+        "상담", "고객지원", "기술지원",
+        "uni-pass", "유니패스", "전산 오류", "시스템 오류",
+        "오류 신고", "담당 부서", "보세산업과", "소관 부서",
+        "관세 불복", "이의신청", "심사청구", "심판청구",
+        "관세사 대행", "관세사 위임", "관세사에게", "관세사",
+        "전화번호"
     ]
 }
 
 # 도메인 우선순위: 동점 시 더 구체적인 카테고리를 선호
+# CONTACT/PENALTIES 같은 기능 카테고리가 도메인(LICENSE/SALES) 보다 우선되어야
+# 한다. "특허 취소 사유" → LICENSE, "관세 불복" → CONTACT 처럼 명확한 의도가
+# 있는 질의에서 분류 정확도를 높이기 위함.
 CATEGORY_PRIORITY = {
-    "PENALTIES": 1,
-    "FOOD_TASTING": 2,
-    "SAMPLE": 3,
-    "SALES": 4,
+    "CONTACT": 1,
+    "PENALTIES": 2,
+    "FOOD_TASTING": 3,
+    "SAMPLE": 4,
     "DOCUMENTS": 5,
-    "CONTACT": 6,
-    "IMPORT_EXPORT": 7,
-    "EXHIBITION": 8,
-    "LICENSE": 9,
+    "SALES": 6,
+    "LICENSE": 7,
+    "IMPORT_EXPORT": 8,
+    "EXHIBITION": 9,
     "GENERAL": 10,
 }
 
 
 def classify_query(query: str) -> list[str]:
     """사용자 질문을 카테고리로 분류한다.
+
+    다어절 구문(예: "특허 신청") 매칭은 단일 단어보다 가중치가 높다.
+    이로써 "전시" 한 단어만 겹친 EXHIBITION이 "보세전시장이 무엇"으로
+    GENERAL에 명확히 매칭되는 질의를 침범하지 않게 한다.
 
     Args:
         query: 사용자 질문 문자열
@@ -92,13 +142,25 @@ def classify_query(query: str) -> list[str]:
         return ["GENERAL"]
 
     query_lower = normalize_query(query)
-    scores = {}
+    scores: dict[str, float] = {}
 
     for category, keywords in CATEGORY_KEYWORDS.items():
-        score = 0
+        score = 0.0
         for keyword in keywords:
-            if keyword in query_lower:
-                score += 1
+            kw = keyword.lower().strip()
+            if not kw:
+                continue
+            if kw in query_lower:
+                # 공백을 포함한 구문은 +2, 단일 단어는 +1
+                if " " in kw:
+                    score += 2.0
+                else:
+                    score += 1.0
+                # 길이 가중치: 5자 이상 +0.6, 3자 이상 +0.3
+                if len(kw) >= 5:
+                    score += 0.6
+                elif len(kw) >= 3:
+                    score += 0.3
         if score > 0:
             scores[category] = score
 
@@ -106,7 +168,7 @@ def classify_query(query: str) -> list[str]:
         return ["GENERAL"]
 
     max_score = max(scores.values())
-    results = [cat for cat, sc in scores.items() if sc == max_score]
+    results = [cat for cat, sc in scores.items() if abs(sc - max_score) < 1e-6]
 
     # 도메인 우선순위로 정렬 (구체적 카테고리 우선)
     results.sort(key=lambda c: CATEGORY_PRIORITY.get(c, 99))
@@ -254,27 +316,30 @@ class IntentClassifier:
             description = intent.get("description", "")
             domain = intent_id + " " + description
 
-        # domain 문자열에서 카테고리 매핑
-        if "System & Qualification" in domain or "제도" in domain or "자격" in domain:
-            return "GENERAL"
-        elif "License" in domain or "특허" in domain:
+        # domain 문자열에서 카테고리 매핑.
+        # 더 구체적인 카테고리(FOOD/SAMPLE/PENALTIES/CONTACT/SALES)를
+        # 광범위한 IMPORT_EXPORT보다 먼저 매칭하여 의도 분류기가 도메인의
+        # "반입/반출" 단어 한 개로 IMPORT_EXPORT를 잘못 반환하는 것을 방지.
+        if "Food" in domain or "식품" in domain or "시식" in domain or "tasting" in domain.lower():
+            return "FOOD_TASTING"
+        elif "Sample" in domain or "견본" in domain or "샘플" in domain:
+            return "SAMPLE"
+        elif "Penalty" in domain or "벌칙" in domain or "제재" in domain or "처벌" in domain or "벌금" in domain:
+            return "PENALTIES"
+        elif "Support" in domain or "문의" in domain or "연락" in domain or "고객지원" in domain or "관세사" in domain:
+            return "CONTACT"
+        elif "Sales" in domain or "판매" in domain or "직매" in domain or "결제" in domain:
+            return "SALES"
+        elif "Document" in domain or "서류" in domain or "문서" in domain or "신고서" in domain:
+            return "DOCUMENTS"
+        elif "License" in domain or "특허" in domain or "permit" in domain.lower():
             return "LICENSE"
+        elif "System & Qualification" in domain or "제도" in domain or "자격" in domain:
+            return "GENERAL"
+        elif "Exhibition" in domain or "전시" in domain or "시연" in domain or "데모" in domain:
+            return "EXHIBITION"
         elif "Import" in domain or "Export" in domain or "반입" in domain or "반출" in domain:
             return "IMPORT_EXPORT"
-        elif "Exhibition" in domain or "전시" in domain:
-            return "EXHIBITION"
-        elif "Sales" in domain or "판매" in domain:
-            return "SALES"
-        elif "Sample" in domain or "견본" in domain:
-            return "SAMPLE"
-        elif "Food" in domain or "식품" in domain or "시식" in domain:
-            return "FOOD_TASTING"
-        elif "Document" in domain or "서류" in domain or "문서" in domain:
-            return "DOCUMENTS"
-        elif "Penalty" in domain or "벌칙" in domain or "제재" in domain:
-            return "PENALTIES"
-        elif "Support" in domain or "문의" in domain or "연락" in domain:
-            return "CONTACT"
 
         return "GENERAL"
 

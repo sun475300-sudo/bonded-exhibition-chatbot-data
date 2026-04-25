@@ -115,6 +115,24 @@ KNOWN_TERMS: set[str] = {
     "허가", "승인", "신고", "확인", "절차", "규정",
     "기간", "회기", "준비기간", "정리기간",
     "수입", "수출", "관세", "면세", "감면",
+
+    # ── 일반 명사 (오교정 방지용) ──
+    "물품", "행사", "주최", "준비", "장소", "사전",
+    "서류", "신청", "허가", "수량", "한도", "제한",
+    "비용", "가액", "가격", "면허", "촬영", "홍보",
+    "라벨", "표시", "한글", "교체", "보관", "주의",
+    "보고", "결과", "종료", "과정", "방법", "사용",
+    "범위", "현장", "직매", "결제", "수금", "정산",
+    "대금", "반환", "반납", "위임", "대리", "대행",
+    "관세사", "이의", "심사", "심판", "불복", "이의신청",
+    "가능", "필요", "이용",
+
+    # ── 자주 사용되는 어형 (조사·어미 포함) ──
+    "이용할", "필요한", "사용할", "전시할", "신고해야",
+    "받나요", "있나요", "되나요", "받을", "있는", "되는",
+    "보세전시장과", "보세전시장이", "보세전시장은", "보세전시장의",
+    "보세전시장에", "보세전시장에서",
+    "유니패스", "uni-pass",
 }
 
 
@@ -250,13 +268,19 @@ def correct_query(query: str) -> tuple[str, list[dict]]:
             corrected_tokens.append(token)
             continue
 
+        # 너무 짧은 토큰은 교정 후보가 광범위하므로 그대로 유지
+        if len(token) <= 2:
+            corrected_tokens.append(token)
+            continue
+
         suggestion = correct_term(token)
         if suggestion is not None and suggestion != token:
             dist = levenshtein_distance(token, suggestion)
-            # 공통 문자 비율이 50% 미만이면 무관한 단어로 판단하여 교정 생략
+            # 공통 문자 비율이 60% 이하이면 무관한 단어로 판단하여 교정 생략.
+            # (50% 임계는 "물품 → 식품", "신고해야 → 신고서" 같은 과교정을 허용한다.)
             common_chars = sum(1 for a, b in zip(token, suggestion) if a == b)
             max_len = max(len(token), len(suggestion))
-            if max_len > 0 and common_chars / max_len < 0.5:
+            if max_len > 0 and common_chars / max_len <= 0.6:
                 corrected_tokens.append(token)
                 continue
             corrections.append({

@@ -158,7 +158,7 @@ class BondedExhibitionChatbot:
         """질문과 카테고리에 매칭되는 FAQ 항목을 찾는다.
 
         파이프라인:
-        1. 키워드 매칭
+        1. 키워드 매칭 (구문/길이 기반 가중치)
         2. TF-IDF 유사도
         3. BM25 랭킹
         4. 벡터 검색 (의미론적 매칭)
@@ -166,28 +166,53 @@ class BondedExhibitionChatbot:
         """
         query_lower = normalize_query(query)
         best_match = None
-        best_score = 0
+        best_score = 0.0
+        best_phrase_hits = 0
         best_keyword_hits = 0
 
-        # 1단계: 키워드 매칭
+        # 1단계: 키워드 매칭. 다어절 구문(phrase)·긴 키워드에 가중치를 부여해
+        # 짧은 단어 1~2개만 중복되는 항목이 우선 매칭되는 문제를 줄인다.
         for item in self.faq_items:
-            score = 0
+            score = 0.0
             keyword_hits = 0
+            phrase_hits = 0
+            specificity = 0.0
 
             if item.get("category") == category:
                 score += CATEGORY_BONUS
 
             keywords = item.get("keywords", [])
             for kw in keywords:
-                if kw.lower() in query_lower:
-                    score += 1
+                kw_norm = kw.lower().strip()
+                if not kw_norm:
+                    continue
+                if kw_norm in query_lower:
                     keyword_hits += 1
+                    # 공백을 포함한 구문은 더 구체적이므로 가중치 +1
+                    if " " in kw_norm:
+                        phrase_hits += 1
+                        score += 2.0
+                    else:
+                        score += 1.0
+                    # 길이 기반 추가 가중치 (3자 이상이면 +0.3, 5자 이상이면 +0.6)
+                    if len(kw_norm) >= 5:
+                        specificity += 0.6
+                    elif len(kw_norm) >= 3:
+                        specificity += 0.3
 
-            if score > best_score or (score == best_score and keyword_hits > best_keyword_hits):
+            score += specificity
+
+            # 우선순위: (1) 점수가 더 높은 항목 (2) 동점이면 구문 매칭이 더 많은 항목
+            if score > best_score or (
+                abs(score - best_score) < 1e-6 and phrase_hits > best_phrase_hits
+            ):
                 best_score = score
                 best_match = item
+                best_phrase_hits = phrase_hits
                 best_keyword_hits = keyword_hits
 
+        # 카테고리 보너스(2)만 적용된 경우(점수 정확히 2)는 의미 있는 매칭이
+        # 아니므로 임계값(3) 이상 + 키워드 1회 이상이라는 기존 조건만 사용한다.
         if best_score >= KEYWORD_SCORE_THRESHOLD and best_keyword_hits >= MIN_KEYWORD_HITS:
             return best_match
 
@@ -405,11 +430,16 @@ class BondedExhibitionChatbot:
             categories = ["GENERAL"]
         primary_category = categories[0]
 
-        # mapped_category가 더 우선도가 높으면 사용
-        # 단, 의도 분류 신뢰도가 임계값(0.3) 이상인 경우에만 적용
-        # 신뢰도가 낙으면 기존 키워드 기반 분류를 유지하여 오매칭을 방지
+        # 의도 분류기는 키워드 분류기가 GENERAL로 떨어진 경우에만 보정 신호로
+        # 사용한다. 키워드 분류기가 이미 구체적인 카테고리를 반환했을 때
+        # 의도 분류기로 덮어쓰면 미세한 도메인 단어(예: "반입") 한 개로
+        # IMPORT_EXPORT 등으로 잘못 라우팅되는 사례가 발생한다.
         INTENT_CONFIDENCE_THRESHOLD = 0.3
-        if mapped_category != "GENERAL" and intent_confidence >= INTENT_CONFIDENCE_THRESHOLD:
+        if (
+            primary_category == "GENERAL"
+            and mapped_category != "GENERAL"
+            and intent_confidence >= INTENT_CONFIDENCE_THRESHOLD
+        ):
             primary_category = mapped_category
 
         # 5단계: FAQ 매칭
