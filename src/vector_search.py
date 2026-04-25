@@ -45,13 +45,20 @@ class VectorSearchEngine:
 
         Args:
             faq_items: FAQ 항목 리스트. 각 항목에 question, keywords, answer, category 필드 필요.
+
+        Raises:
+            ImportError: numpy가 설치되지 않은 경우 (벡터 연산 불가).
         """
+        if np is None:
+            raise ImportError(
+                "numpy 가 필요합니다. 설치: pip install numpy"
+            )
         self.faq_items = faq_items
         if HAS_EMBEDDINGS and SentenceTransformer:
             self.model = SentenceTransformer("sentence-transformers/paraphrase-multilingual-MiniLM-L12-v2")
         else:
             self.model = DummyModel()
-            
+
         self.embeddings = None
         self.embedding_cache = {}  # 동일 질문 재인코딩 방지
 
