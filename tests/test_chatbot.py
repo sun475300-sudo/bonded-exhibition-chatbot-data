@@ -108,3 +108,58 @@ class TestFAQMatching:
         # 최소 카테고리 매칭(+2)으로 매칭될 수 있음
         # 스코어가 1 이상이면 매칭되므로 None이 아닐 수 있다
         assert result is None or isinstance(result, dict)
+
+
+class TestLawSnippetIntegration:
+    """국가법령정보센터 동기화 결과(law_snippets)가 답변에 반영되는지 검증."""
+
+    def test_collect_legal_guide_uses_snippet(self, chatbot):
+        faq_match = {
+            "legal_basis": ["관세법 제190조"],
+            "law_snippets": {
+                "관세법 제190조": {
+                    "content": "[법령센터 동기화] 보세전시장 최신 본문",
+                    "law_name": "관세법",
+                    "article": "제190조",
+                    "fetched_at": "2026-04-25T00:00:00",
+                }
+            },
+        }
+        guide = chatbot._collect_legal_guide(faq_match)
+        assert any("[법령센터 동기화]" in g for g in guide)
+
+    def test_collect_legal_guide_falls_back_to_kg(self, chatbot):
+        # snippets 없으면 KnowledgeGraph 폴백 (없을 수도 있으므로 빈 결과 허용)
+        faq_match = {"legal_basis": ["관세법 제190조"]}
+        guide = chatbot._collect_legal_guide(faq_match)
+        assert isinstance(guide, list)
+
+    def test_reload_picks_up_new_faq_data(self, chatbot, tmp_path, monkeypatch):
+        """data/faq.json 갱신 후 reload() 호출 시 신규 FAQ가 반영된다."""
+        import json as _json
+        import os as _os
+        from src import chatbot as chatbot_mod
+
+        # 원본을 백업하고 임시 디렉토리에서 작업
+        base_dir = _os.path.dirname(_os.path.dirname(_os.path.abspath(chatbot_mod.__file__)))
+        faq_path = _os.path.join(base_dir, "data", "faq.json")
+        backup = _json.load(open(faq_path, "r", encoding="utf-8"))
+        try:
+            mutated = _json.loads(_json.dumps(backup))
+            mutated["items"].append({
+                "id": "ZZZTEST",
+                "category": "GENERAL",
+                "question": "테스트용 신규 FAQ 질문",
+                "answer": "신규 답변 본문",
+                "legal_basis": [],
+                "keywords": ["테스트용신규FAQ"],
+            })
+            with open(faq_path, "w", encoding="utf-8") as f:
+                _json.dump(mutated, f, ensure_ascii=False)
+            stats = chatbot.reload()
+            assert any(i.get("id") == "ZZZTEST" for i in chatbot.faq_items)
+            assert stats["faq_items"] == len(chatbot.faq_items)
+        finally:
+            with open(faq_path, "w", encoding="utf-8") as f:
+                _json.dump(backup, f, ensure_ascii=False, indent=2)
+            chatbot.reload()

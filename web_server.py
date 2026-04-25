@@ -1922,14 +1922,23 @@ def admin_law_sync_check():
 @app.route("/api/admin/law-sync/sync", methods=["POST"])
 @jwt_auth.require_auth()
 def admin_law_sync_apply():
-    """법령 변경을 확인하고 legal_references.json을 자동 업데이트한다."""
+    """법령 변경을 확인하고 legal_references.json + faq.json을 자동 업데이트한 뒤
+    실행 중인 챗봇 인스턴스를 핫리로드한다."""
     try:
-        check_result = law_sync_manager.check_all()
-        update_result = law_sync_manager.update_legal_references()
-        return jsonify({
-            "check": check_result,
-            "update": update_result,
-        })
+        result = law_sync_manager.sync_all(apply_to_faq=True)
+        # 변경분이 있으면 챗봇 데이터 재로드 (프로세스 재시작 없이 즉시 반영)
+        reloaded = False
+        if (
+            (result.get("legal_references", {}) or {}).get("updated", 0) > 0
+            or (result.get("faq", {}) or {}).get("updated_faqs", 0) > 0
+        ):
+            try:
+                chatbot.reload()
+                reloaded = True
+            except Exception as reload_err:
+                logger.warning(f"챗봇 핫리로드 실패: {reload_err}")
+        result["chatbot_reloaded"] = reloaded
+        return jsonify(result)
     except Exception as e:
         logger.error(f"법령 동기화 실패: {e}")
         return jsonify({"error": str(e)}), 500

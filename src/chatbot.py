@@ -55,21 +55,11 @@ class BondedExhibitionChatbot:
     """보세전시장 민원응대 챗봇 클래스."""
 
     def __init__(self):
-        self.config = load_json("config/chatbot_config.json")
-        self.faq_data = load_json("data/faq.json")
-        try:
-            self.legal_refs = load_json("data/legal_references.json").get("references", [])
-        except Exception as e:
-            logger.warning(f"Failed to load legal_references.json: {e}")
-            self.legal_refs = []
-        self.system_prompt = load_text("config/system_prompt.txt")
-        self.faq_items = self._normalize_faq_items(self.faq_data.get("items", []))
-        self.tfidf_matcher = TFIDFMatcher(self.faq_items)
+        self._classifier_cache: OrderedDict[str, list[str]] = OrderedDict()
+        self._load_data_sources()
         self.session_manager = SessionManager()
         self.smart_classifier = SmartClassifier()
         self.clarification_engine = ClarificationEngine()
-        self.related_faq_finder = RelatedFAQFinder(self.faq_items)
-        self._classifier_cache: OrderedDict[str, list[str]] = OrderedDict()
 
         # 새 파이프라인 컴포넌트 초기화
         self.intent_classifier = get_intent_classifier()
@@ -108,6 +98,45 @@ class BondedExhibitionChatbot:
         except Exception:
             pass
 
+    def _load_data_sources(self) -> None:
+        """FAQ/설정/법령 데이터를 로드하고 인덱서를 재구축한다.
+
+        :meth:`reload` 가 호출될 때마다 동일한 절차를 반복한다.
+        """
+        self.config = load_json("config/chatbot_config.json")
+        self.faq_data = load_json("data/faq.json")
+        try:
+            self.legal_refs = load_json("data/legal_references.json").get("references", [])
+        except Exception as e:
+            logger.warning(f"Failed to load legal_references.json: {e}")
+            self.legal_refs = []
+        self.system_prompt = load_text("config/system_prompt.txt")
+        self.faq_items = self._normalize_faq_items(self.faq_data.get("items", []))
+        self.tfidf_matcher = TFIDFMatcher(self.faq_items)
+        self.related_faq_finder = RelatedFAQFinder(self.faq_items)
+        # 새 데이터에 대해 분류 캐시는 무효화한다.
+        self._classifier_cache.clear()
+
+    def reload(self) -> dict:
+        """데이터 파일이 갱신된 후 챗봇 내부 상태를 다시 로드한다.
+
+        법령 정보 자동 동기화 모듈이 ``data/faq.json`` /
+        ``data/legal_references.json`` 을 갱신했을 때 호출하면, 별도
+        프로세스 재시작 없이 최신 법령 텍스트를 답변에 반영할 수 있다.
+        """
+        self._load_data_sources()
+        # 지식 그래프도 새 FAQ 항목으로 재구축한다.
+        self.knowledge_graph = None
+        try:
+            from src.knowledge_graph import KnowledgeGraph
+            self.knowledge_graph = KnowledgeGraph.build_from_faq(self.faq_items)
+        except Exception:
+            pass
+        return {
+            "faq_items": len(self.faq_items),
+            "legal_references": len(self.legal_refs),
+        }
+
     @staticmethod
     def _normalize_faq_items(items: list[dict]) -> list[dict]:
         """FAQ 항목을 정규화하여 신/구 포맷 모두 호환되도록 한다.
@@ -137,6 +166,38 @@ class BondedExhibitionChatbot:
                 n["citations"] = n["legal_basis"]
             normalized.append(n)
         return normalized
+
+    def _collect_legal_guide(self, faq_match: dict) -> list[str]:
+        """FAQ 항목의 법령 근거를 안내 문자열 목록으로 변환한다.
+
+        ``law_snippets`` (LawSyncManager.apply_to_faq 가 채움)에 최신 본문이
+        있으면 우선 사용하고, 없으면 KnowledgeGraph 의 요약을 폴백으로 쓴다.
+        """
+        guide: list[str] = []
+        snippets = faq_match.get("law_snippets") or {}
+        for basis in faq_match.get("legal_basis", []) or []:
+            text: str | None = None
+            # 1) law_snippets 우선
+            if snippets:
+                # apply_to_faq 키는 "법령명 제N조" 형태이므로 부분 일치 검색
+                for key, snippet in snippets.items():
+                    if key and key in basis:
+                        text = (snippet or {}).get("content")
+                        break
+                    law = (snippet or {}).get("law_name", "")
+                    article = (snippet or {}).get("article", "")
+                    if law and article and law in basis and article in basis:
+                        text = (snippet or {}).get("content")
+                        break
+            # 2) KnowledgeGraph 폴백
+            if not text and self.knowledge_graph:
+                law_node_id = f"law_{basis}"
+                if law_node_id in self.knowledge_graph.nodes:
+                    node_data = self.knowledge_graph.nodes[law_node_id].get("data", {})
+                    text = node_data.get("summary")
+            if text:
+                guide.append(f"{basis}: {text}")
+        return guide
 
     def _cached_classify(self, query: str) -> list[str]:
         """Classify a query with LRU caching (max 100 entries)."""
@@ -495,16 +556,10 @@ class BondedExhibitionChatbot:
                     risk_level, policy_decision, escalation_triggered,
                 )
 
-            # 법령 가이드 요약 추출 (지식 그래프 연계)
-            legal_guide = []
-            if self.knowledge_graph:
-                for basis in faq_match.get("legal_basis", []):
-                    law_node_id = f"law_{basis}"
-                    if law_node_id in self.knowledge_graph.nodes:
-                        node_data = self.knowledge_graph.nodes[law_node_id].get("data", {})
-                        summary = node_data.get("summary")
-                        if summary:
-                            legal_guide.append(f"{basis}: {summary}")
+            # 법령 가이드 요약 추출
+            # 1순위: 국가법령정보센터 동기화 결과(law_snippets) - 최신 법령 본문
+            # 2순위: 지식 그래프(KnowledgeGraph)
+            legal_guide = self._collect_legal_guide(faq_match)
 
             response = build_response(
                 topic=category_name,

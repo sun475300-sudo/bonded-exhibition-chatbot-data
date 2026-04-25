@@ -26,6 +26,7 @@ from urllib.parse import quote
 BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 DB_PATH = os.path.join(BASE_DIR, "data", "law_sync.db")
 LEGAL_REF_PATH = os.path.join(BASE_DIR, "data", "legal_references.json")
+FAQ_PATH = os.path.join(BASE_DIR, "data", "faq.json")
 
 LAW_API_BASE = "https://www.law.go.kr/DRF/lawService.do"
 LAW_SEARCH_BASE = "https://www.law.go.kr/DRF/lawSearch.do"
@@ -291,6 +292,115 @@ class LawSyncManager:
 
         return {"updated": updated, "total": len(data.get("references", []))}
 
+    def apply_to_faq(self, faq_path=None):
+        """캐시된 최신 조문을 FAQ 항목의 law_snippets 메타필드에 반영한다.
+
+        ``legal_basis``에 명시된 법령/조항을 매칭하여, 최신 조문 텍스트와
+        동기화 시각을 ``law_snippets`` 딕셔너리에 기록한다. 챗봇은 답변 생성
+        시 이 필드를 참조하여 최신 조문 요약을 함께 안내할 수 있다.
+
+        Args:
+            faq_path: FAQ 파일 경로. 지정하지 않으면 기본 경로 사용.
+
+        Returns:
+            {"updated_faqs": int, "total_faqs": int, "updated_articles": int}
+        """
+        path = faq_path or FAQ_PATH
+        if not os.path.exists(path):
+            return {"updated_faqs": 0, "total_faqs": 0, "updated_articles": 0}
+
+        with open(path, "r", encoding="utf-8") as f:
+            faq_data = json.load(f)
+
+        items = faq_data.get("items", [])
+        updated_faqs = 0
+        updated_articles = 0
+
+        for item in items:
+            legal_basis_list = item.get("legal_basis", []) or []
+            snippets = item.get("law_snippets", {}) or {}
+            item_changed = False
+
+            for basis in legal_basis_list:
+                law_name, article = self._parse_legal_basis(basis)
+                if not law_name or not article:
+                    continue
+                cached = self.get_cached_content(law_name, article)
+                if not cached or not cached.get("content"):
+                    continue
+
+                snippet_text = cached["content"][:300].strip()
+                key = f"{law_name} {article}"
+                existing = snippets.get(key, {})
+                if existing.get("content_hash") == cached.get("content_hash"):
+                    continue
+
+                snippets[key] = {
+                    "content": snippet_text,
+                    "content_hash": cached.get("content_hash"),
+                    "fetched_at": cached.get("fetched_at"),
+                    "law_name": law_name,
+                    "article": article,
+                }
+                updated_articles += 1
+                item_changed = True
+
+            if item_changed:
+                item["law_snippets"] = snippets
+                item["last_law_synced"] = datetime.now().isoformat()
+                updated_faqs += 1
+
+        if updated_faqs > 0:
+            faq_data["last_updated"] = datetime.now().date().isoformat()
+            with open(path, "w", encoding="utf-8") as f:
+                json.dump(faq_data, f, ensure_ascii=False, indent=2)
+
+        return {
+            "updated_faqs": updated_faqs,
+            "total_faqs": len(items),
+            "updated_articles": updated_articles,
+        }
+
+    @staticmethod
+    def _parse_legal_basis(basis_text):
+        """``"관세법 제190조"`` 형태에서 (법령명, 조항)을 추출한다.
+
+        괄호로 둘러싼 조항 제목은 무시한다. 예: "제190조(보세전시장)" → 제190조.
+        """
+        if not basis_text:
+            return None, None
+        text = basis_text.strip()
+        if "(" in text:
+            text = text.split("(")[0].strip()
+        # 마지막 토큰이 "제N조" 패턴인지 확인
+        tokens = text.split()
+        for idx in range(len(tokens) - 1, -1, -1):
+            tok = tokens[idx]
+            if tok.startswith("제") and "조" in tok:
+                law_name = " ".join(tokens[:idx]).strip()
+                article = tok
+                if law_name and article:
+                    return law_name, article
+        return None, None
+
+    def sync_all(self, apply_to_faq=True):
+        """전체 동기화를 한 번에 수행한다.
+
+        ``check_all`` → ``update_legal_references`` → ``apply_to_faq`` 순으로
+        실행하여 ``data/faq.json``과 ``data/legal_references.json`` 모두
+        최신 법령 본문 요약으로 갱신한다.
+        """
+        check_result = self.check_all()
+        legal_result = self.update_legal_references()
+        faq_result = {"updated_faqs": 0, "total_faqs": 0, "updated_articles": 0}
+        if apply_to_faq:
+            faq_result = self.apply_to_faq()
+        return {
+            "check": check_result,
+            "legal_references": legal_result,
+            "faq": faq_result,
+        }
+
     def get_monitored_laws(self):
         """모니터링 대상 법령 목록을 반환한다."""
         return MONITORED_LAWS
@@ -314,12 +424,14 @@ if __name__ == "__main__":
             print(f"[{mark}] {h['law_name']} {h['article']} - {h['checked_at']}")
     elif args.sync:
         print("법령 변경 확인 중...")
-        result = manager.check_all()
-        print(f"확인: {result['total_checked']}개, 변경: {result['changes_detected']}개, 오류: {result['errors']}개")
-        if result["changes_detected"] > 0:
-            print("legal_references.json 업데이트 중...")
-            update_result = manager.update_legal_references()
-            print(f"업데이트: {update_result['updated']}/{update_result['total']}개")
+        result = manager.sync_all(apply_to_faq=True)
+        check = result["check"]
+        legal = result["legal_references"]
+        faq = result["faq"]
+        print(f"확인: {check['total_checked']}개, 변경: {check['changes_detected']}개, 오류: {check['errors']}개")
+        print(f"legal_references 업데이트: {legal.get('updated', 0)}/{legal.get('total', 0)}개")
+        print(f"FAQ 업데이트: {faq.get('updated_faqs', 0)}/{faq.get('total_faqs', 0)}개"
+              f" (조항 {faq.get('updated_articles', 0)}건)")
     else:
         print("법령 변경 확인 중...")
         result = manager.check_all()
