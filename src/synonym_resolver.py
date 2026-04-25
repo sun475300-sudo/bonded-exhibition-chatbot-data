@@ -105,6 +105,11 @@ def expand_query(query: str) -> str:
     that exact-match scoring still works, and the canonical terms are
     appended so that FAQ/keyword lookups can also match.
 
+    Synonyms are matched only when they appear as standalone tokens
+    (whitespace-separated) or as full token prefixes. This prevents
+    false positives like "허가"가 "특허가" 안에서 매칭되어 의도치 않은
+    "면허" 동의어가 부착되는 문제를 차단한다.
+
     Args:
         query: The raw user query string.
 
@@ -113,9 +118,22 @@ def expand_query(query: str) -> str:
         (space-separated).  If no synonyms are found the original query
         is returned unchanged.
     """
+    tokens = query.split()
     canonical_terms: list[str] = []
     for synonym in _SORTED_KEYS:
-        if synonym in query:
+        # 토큰이 동의어와 정확히 일치하거나, 동의어 + 한국어 조사 형태인 경우만 매칭.
+        # "허가" 동의어가 "특허가"에서 임의로 매칭되는 것을 방지하기 위해
+        # in 검사 대신 토큰 시작 위치에서의 매칭을 요구한다.
+        matched = False
+        for tok in tokens:
+            if tok == synonym or tok.startswith(synonym):
+                # 영어/공백 동의어는 부분 일치도 허용 (예: "ATA Carnet")
+                if " " in synonym:
+                    matched = synonym in query
+                    break
+                matched = True
+                break
+        if matched:
             canonical = SYNONYMS[synonym]
             if canonical not in canonical_terms:
                 canonical_terms.append(canonical)

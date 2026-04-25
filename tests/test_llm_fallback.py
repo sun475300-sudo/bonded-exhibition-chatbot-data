@@ -8,6 +8,7 @@ from src.llm_fallback import (
     ResponseCache,
     LLMFallbackProvider,
     get_llm_provider,
+    HAS_ANTHROPIC,
 )
 
 
@@ -149,6 +150,7 @@ class TestResponseCache:
         assert cache.get("key1") == "value2"
 
 
+@pytest.mark.skipif(not HAS_ANTHROPIC, reason="anthropic SDK not installed")
 class TestLLMFallbackProvider:
     """LLMFallbackProvider 테스트."""
 

@@ -6,7 +6,7 @@
 
 import re
 
-from src.classifier import classify_query, CATEGORY_PRIORITY
+from src.classifier import classify_query
 
 # 후속 질문 패턴: 이전 카테고리를 유지할 가능성이 높은 접속사/표현
 FOLLOW_UP_PATTERNS = [

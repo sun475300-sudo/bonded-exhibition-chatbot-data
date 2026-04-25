@@ -127,6 +127,70 @@ class TestUpdateLegalReferences:
             mod.LEGAL_REF_PATH = original_path
 
 
+class TestApplyToFAQ:
+    def test_parse_legal_basis_simple(self):
+        from src.law_api_sync import LawSyncManager
+        law, art = LawSyncManager._parse_legal_basis("관세법 제190조")
+        assert law == "관세법"
+        assert art == "제190조"
+
+    def test_parse_legal_basis_with_title(self):
+        from src.law_api_sync import LawSyncManager
+        law, art = LawSyncManager._parse_legal_basis("관세법 시행령 제101조(판매용품의 면허전 사용금지)")
+        assert law == "관세법 시행령"
+        assert art == "제101조"
+
+    def test_parse_legal_basis_invalid(self):
+        from src.law_api_sync import LawSyncManager
+        law, art = LawSyncManager._parse_legal_basis("관세청 고시")
+        assert law is None
+        assert art is None
+
+    def test_apply_to_faq_no_cache(self, sync_manager, tmp_path):
+        faq_path = tmp_path / "faq.json"
+        faq_path.write_text(json.dumps({
+            "items": [{"id": "A", "legal_basis": ["관세법 제190조"]}]
+        }, ensure_ascii=False), encoding="utf-8")
+        result = sync_manager.apply_to_faq(faq_path=str(faq_path))
+        assert result["updated_faqs"] == 0
+
+    def test_apply_to_faq_writes_snippet(self, sync_manager, tmp_path):
+        sync_manager._record_check(
+            "관세법", "제190조", "보세전시장은 박람회 등에서 외국물품을 장치·전시·사용하는 보세구역."
+        )
+        faq_path = tmp_path / "faq.json"
+        faq_path.write_text(json.dumps({
+            "items": [{"id": "A", "legal_basis": ["관세법 제190조"]}]
+        }, ensure_ascii=False), encoding="utf-8")
+        result = sync_manager.apply_to_faq(faq_path=str(faq_path))
+        assert result["updated_faqs"] == 1
+        assert result["updated_articles"] == 1
+        # 두 번째 호출은 동일 해시이므로 변경 없음
+        result2 = sync_manager.apply_to_faq(faq_path=str(faq_path))
+        assert result2["updated_faqs"] == 0
+        with open(faq_path, "r", encoding="utf-8") as f:
+            data = json.load(f)
+        snippets = data["items"][0].get("law_snippets", {})
+        assert "관세법 제190조" in snippets
+        assert snippets["관세법 제190조"]["content"].startswith("보세전시장")
+
+    def test_apply_to_faq_with_title_in_basis(self, sync_manager, tmp_path):
+        sync_manager._record_check("관세법 시행령", "제101조", "판매용품의 면허전 사용금지 본문...")
+        faq_path = tmp_path / "faq.json"
+        faq_path.write_text(json.dumps({
+            "items": [{"id": "C", "legal_basis": ["관세법 시행령 제101조(판매용품의 면허전 사용금지)"]}]
+        }, ensure_ascii=False), encoding="utf-8")
+        result = sync_manager.apply_to_faq(faq_path=str(faq_path))
+        assert result["updated_faqs"] == 1
+
+    def test_sync_all_returns_combined(self, sync_manager, tmp_path):
+        # check_all은 네트워크 의존이므로 빈 결과여야 한다.
+        result = sync_manager.sync_all(apply_to_faq=False)
+        assert "check" in result
+        assert "legal_references" in result
+        assert "faq" in result
+
+
 class TestLawSyncAPI:
     @pytest.fixture
     def client(self):

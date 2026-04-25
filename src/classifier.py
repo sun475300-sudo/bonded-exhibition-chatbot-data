@@ -14,53 +14,70 @@ CATEGORY_KEYWORDS = {
     "GENERAL": [
         "보세전시장", "보세구역", "제도", "정의", "개념", "뜻", "무엇",
         "어떤 곳", "어떤곳", "보세 전시장", "보세창고", "차이", "다른 점",
-        "내국물품", "국산", "비교", "구분", "이용", "누가", "자격"
+        "내국물품", "국산", "비교", "구분", "누가",
+        "행사 주최", "주최하려면", "운영인 자격"
     ],
     "LICENSE": [
         "특허", "운영", "설치", "특허기간", "특허신청",
-        "특허장소", "운영인", "설치특허", "갱신", "연장", "변경",
-        "특허 연장", "기간 연장"
+        "특허장소", "운영인", "설치특허", "갱신", "연장",
+        "특허 연장", "기간 연장",
+        "특허 신청", "특허 신청하려면", "특허 받으려면",
+        "특허 수수료", "신청 수수료", "특허 비용",
+        "특허 취소", "취소 사유"
     ],
     "IMPORT_EXPORT": [
         "반입", "반출", "반출입", "물품검사",
         "들여오", "내보내", "가져오", "꺼내", "재반출", "반송",
         "돌려보내", "잔류", "남은 물품", "미반출",
-        "해외로", "세관 검사", "반입 검사"
+        "해외로", "세관 검사", "반입 검사",
+        "보세운송", "물품 이동", "다른 보세전시장", "보세전시장 간",
+        "물품이 남", "전시 종료 후"
     ],
     "EXHIBITION": [
-        "전시", "장치", "진열", "디스플레이", "전시회",
+        "전시 가능", "전시 목적", "장치", "진열", "디스플레이",
         "박람회", "전람회", "시연", "데모", "시범", "체험",
-        "사용 범위", "전시 목적", "전시 가능"
+        "사용 범위", "장치된 물품", "전시물 교체", "물품 교체",
+        "전시장 내", "보관 시 주의", "촬영", "홍보 활동",
+        "전시 기간", "전시할 수", "전시물", "물품 제한",
+        "물품에 제한", "어디까지 사용", "중간에 바꿀"
     ],
     "SALES": [
-        "판매", "직매", "현장판매", "현장 판매", "인도", "구매",
+        "판매", "직매", "현장판매", "현장 판매", "구매",
         "매매", "사다", "팔다", "팔 수", "물건 팔", "살 수",
         "현장에서 판매", "바로 판매",
-        "계약", "주문", "인도 시점", "통관 후"
+        "계약", "주문", "통관 후",
+        "수입면허 신청", "면허 신청 절차", "결제", "수금", "정산"
     ],
     "SAMPLE": [
         "견본품", "샘플", "견본", "홍보용", "시료", "무료 배포",
-        "무료배포", "나눠주", "견본품 관세", "견본품 세금", "견본품 과세"
+        "무료배포", "나눠주", "견본품 관세", "견본품 세금", "견본품 과세",
+        "견본품 수량", "견본품 반환", "샘플 반납"
     ],
     "FOOD_TASTING": [
         "시식", "식품", "음식", "요건확인", "세관장확인",
-        "식약처", "검역", "위생", "시식용", "잔량", "폐기",
-        "남은 식품"
+        "식약처", "검역", "위생", "시식용",
+        "남은 식품", "시식 식품"
     ],
     "DOCUMENTS": [
         "서류", "신고서", "신청서", "구비서류", "제출", "양식",
-        "서식", "첨부", "문서", "반출입신고서", "허가 신청"
+        "서식", "첨부", "문서", "반출입신고서",
+        "어떤 서류", "필요한 서류", "결과 보고"
     ],
     "PENALTIES": [
         "벌칙", "제재", "과태료", "벌금", "처벌", "위반", "처분",
-        "불이익", "과징금", "무허가", "밀수", "특허 취소",
-        "업무 정지", "의무 위반", "허가 없이", "면허 없이",
-        "어떻게 되나", "처벌받", "걸리면"
+        "불이익", "과징금", "무허가", "밀수",
+        "업무 정지", "의무 위반", "의무위반", "의무위반시",
+        "운영인 의무", "운영인 의무위반", "허가 없이", "면허 없이",
+        "처벌받", "걸리면"
     ],
     "CONTACT": [
         "문의", "전화", "연락처", "담당", "어디에", "누구에게",
-        "상담", "고객지원", "기술지원", "보세산업과", "어디",
-        "담당 부서", "소관"
+        "상담", "고객지원", "기술지원", "보세산업과",
+        "담당 부서", "소관",
+        "유니패스", "uni-pass",
+        "관세사", "관세사 위임", "위임", "대행", "통관 대행",
+        "불복", "이의신청", "심사청구", "심판청구",
+        "오류 신고"
     ]
 }
 
@@ -234,11 +251,81 @@ class IntentClassifier:
 
         return (best_intent, best_score)
 
+    # intent_id 토큰 → 카테고리 매핑 (구체적인 도메인이 먼저 평가되도록 정렬).
+    # 예: "tasting_food" 는 IMPORT_EXPORT 보다 FOOD_TASTING 으로 분류되어야 한다.
+    _INTENT_ID_CATEGORY_RULES = (
+        # (토큰 키워드, 카테고리)
+        ("tasting", "FOOD_TASTING"),
+        ("food", "FOOD_TASTING"),
+        ("sample", "SAMPLE"),
+        ("gift", "SAMPLE"),
+        ("demo", "SAMPLE"),
+        ("penalty", "PENALTIES"),
+        ("noncompliance", "PENALTIES"),
+        ("loss_or_damage", "PENALTIES"),
+        ("sale", "SALES"),
+        ("domestic_release", "SALES"),
+        ("permit", "LICENSE"),
+        ("operator", "LICENSE"),
+        ("eligibility", "LICENSE"),
+        ("required_documents", "DOCUMENTS"),
+        ("inventory", "DOCUMENTS"),
+        ("declaration", "IMPORT_EXPORT"),
+        ("inspection", "IMPORT_EXPORT"),
+        ("inbound", "IMPORT_EXPORT"),
+        ("outbound", "IMPORT_EXPORT"),
+        ("reexport", "IMPORT_EXPORT"),
+        ("transfer", "IMPORT_EXPORT"),
+        ("display", "EXHIBITION"),
+        ("exhibition_hall", "EXHIBITION"),
+        ("facility", "EXHIBITION"),
+        ("definition", "GENERAL"),
+        ("comprehensive", "GENERAL"),
+        ("difference", "GENERAL"),
+        ("legal_basis", "GENERAL"),
+        ("contact", "CONTACT"),
+        ("support", "CONTACT"),
+    )
+
+    # 한국어 키워드 (domain/description fallback). 더 구체적인 카테고리부터.
+    _DOMAIN_CATEGORY_RULES = (
+        ("시식", "FOOD_TASTING"),
+        ("식품", "FOOD_TASTING"),
+        ("Food", "FOOD_TASTING"),
+        ("Tasting", "FOOD_TASTING"),
+        ("견본", "SAMPLE"),
+        ("샘플", "SAMPLE"),
+        ("Sample", "SAMPLE"),
+        ("벌칙", "PENALTIES"),
+        ("제재", "PENALTIES"),
+        ("처분", "PENALTIES"),
+        ("Penalty", "PENALTIES"),
+        ("판매", "SALES"),
+        ("Sales", "SALES"),
+        ("특허", "LICENSE"),
+        ("License", "LICENSE"),
+        ("Permit", "LICENSE"),
+        ("서류", "DOCUMENTS"),
+        ("문서", "DOCUMENTS"),
+        ("Document", "DOCUMENTS"),
+        ("반입", "IMPORT_EXPORT"),
+        ("반출", "IMPORT_EXPORT"),
+        ("Import", "IMPORT_EXPORT"),
+        ("Export", "IMPORT_EXPORT"),
+        ("전시", "EXHIBITION"),
+        ("Exhibition", "EXHIBITION"),
+        ("문의", "CONTACT"),
+        ("연락", "CONTACT"),
+        ("Support", "CONTACT"),
+        ("제도", "GENERAL"),
+        ("자격", "GENERAL"),
+    )
+
     def get_intent_category(self, intent_id: str) -> str:
         """의도 ID를 기존 10-category 시스템으로 매핑한다.
 
         Args:
-            intent_id: 의도 ID (예: "sysqual_001", "bonded_exhibition_definition")
+            intent_id: 의도 ID (예: "tasting_food", "permit_application_process")
 
         Returns:
             기존 카테고리 코드 (예: "GENERAL", "LICENSE")
@@ -247,34 +334,20 @@ class IntentClassifier:
             return "GENERAL"
 
         intent = self.intents[intent_id]
-        # 'domain' 필드가 없으면 intent_id 또는 description으로 카테고리 추론
-        domain = intent.get("domain", "")
-        if not domain:
-            # intent_id 또는 description에서 카테고리 추론
-            description = intent.get("description", "")
-            domain = intent_id + " " + description
+        intent_id_lower = intent_id.lower()
 
-        # domain 문자열에서 카테고리 매핑
-        if "System & Qualification" in domain or "제도" in domain or "자격" in domain:
+        # 1) intent_id 토큰 기반 매핑 (가장 신뢰도 높음)
+        for token, category in self._INTENT_ID_CATEGORY_RULES:
+            if token in intent_id_lower:
+                return category
+
+        # 2) domain / description 기반 폴백
+        haystack = (intent.get("domain", "") + " " + intent.get("description", "")).strip()
+        if not haystack:
             return "GENERAL"
-        elif "License" in domain or "특허" in domain:
-            return "LICENSE"
-        elif "Import" in domain or "Export" in domain or "반입" in domain or "반출" in domain:
-            return "IMPORT_EXPORT"
-        elif "Exhibition" in domain or "전시" in domain:
-            return "EXHIBITION"
-        elif "Sales" in domain or "판매" in domain:
-            return "SALES"
-        elif "Sample" in domain or "견본" in domain:
-            return "SAMPLE"
-        elif "Food" in domain or "식품" in domain or "시식" in domain:
-            return "FOOD_TASTING"
-        elif "Document" in domain or "서류" in domain or "문서" in domain:
-            return "DOCUMENTS"
-        elif "Penalty" in domain or "벌칙" in domain or "제재" in domain:
-            return "PENALTIES"
-        elif "Support" in domain or "문의" in domain or "연락" in domain:
-            return "CONTACT"
+        for token, category in self._DOMAIN_CATEGORY_RULES:
+            if token in haystack:
+                return category
 
         return "GENERAL"
 

@@ -6,7 +6,6 @@
 import os
 import sqlite3
 import time
-from collections import Counter
 from contextlib import contextmanager
 
 

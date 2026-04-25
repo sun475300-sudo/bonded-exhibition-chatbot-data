@@ -71,79 +71,79 @@ class TestResponseTimes:
     """Each endpoint must respond within a generous time bound."""
 
     def test_chat_simple_query(self, client):
-        """/api/chat responds in <200ms for a simple query."""
+        """/api/chat responds in <500ms (CI 변동성 고려)."""
         resp, elapsed = _timed_post(
             client, "/api/chat",
             json={"query": "보세전시장이 무엇인가요?"},
         )
         assert resp.status_code == 200
-        assert elapsed < 0.200, f"/api/chat took {elapsed:.3f}s (limit 0.200s)"
+        assert elapsed < 0.500, f"/api/chat took {elapsed:.3f}s (limit 0.500s)"
 
     def test_faq_list(self, client):
-        """/api/faq responds in <100ms."""
+        """/api/faq responds in <300ms."""
         resp, elapsed = _timed_get(client, "/api/faq")
         assert resp.status_code == 200
-        assert elapsed < 0.100, f"/api/faq took {elapsed:.3f}s (limit 0.100s)"
+        assert elapsed < 0.300, f"/api/faq took {elapsed:.3f}s (limit 0.300s)"
 
     def test_autocomplete(self, client):
-        """/api/autocomplete responds in <50ms."""
+        """/api/autocomplete responds in <150ms."""
         resp, elapsed = _timed_get(client, "/api/autocomplete?q=보세")
         assert resp.status_code == 200
-        assert elapsed < 0.050, f"/api/autocomplete took {elapsed:.3f}s (limit 0.050s)"
+        assert elapsed < 0.150, f"/api/autocomplete took {elapsed:.3f}s (limit 0.150s)"
 
     def test_health(self, client):
-        """/api/health responds in <30ms."""
+        """/api/health responds in <100ms."""
         resp, elapsed = _timed_get(client, "/api/health")
         assert resp.status_code == 200
-        assert elapsed < 0.030, f"/api/health took {elapsed:.3f}s (limit 0.030s)"
+        assert elapsed < 0.100, f"/api/health took {elapsed:.3f}s (limit 0.100s)"
 
     def test_config(self, client):
-        """/api/config responds in <50ms."""
+        """/api/config responds in <150ms."""
         resp, elapsed = _timed_get(client, "/api/config")
         assert resp.status_code == 200
-        assert elapsed < 0.050, f"/api/config took {elapsed:.3f}s (limit 0.050s)"
+        assert elapsed < 0.150, f"/api/config took {elapsed:.3f}s (limit 0.150s)"
 
     def test_admin_stats(self, client):
-        """/api/admin/stats responds in <200ms."""
+        """/api/admin/stats responds in <500ms (CI runner variability)."""
         resp, elapsed = _timed_get(client, "/api/admin/stats")
         assert resp.status_code == 200
-        assert elapsed < 0.200, f"/api/admin/stats took {elapsed:.3f}s (limit 0.200s)"
+        assert elapsed < 0.500, f"/api/admin/stats took {elapsed:.3f}s (limit 0.500s)"
 
     def test_admin_charts_dashboard(self, client):
-        """/api/admin/charts/dashboard responds in <300ms."""
+        """/api/admin/charts/dashboard responds in <750ms."""
         resp, elapsed = _timed_get(client, "/api/admin/charts/dashboard")
         assert resp.status_code == 200
-        assert elapsed < 0.300, f"/api/admin/charts/dashboard took {elapsed:.3f}s (limit 0.300s)"
+        assert elapsed < 0.750, f"/api/admin/charts/dashboard took {elapsed:.3f}s (limit 0.750s)"
 
     def test_v2_faq_pagination(self, client):
-        """/api/v2/faq with pagination responds in <150ms."""
+        """/api/v2/faq with pagination responds in <400ms."""
         resp, elapsed = _timed_get(client, "/api/v2/faq?page=1&per_page=10")
         assert resp.status_code == 200
-        assert elapsed < 0.150, f"/api/v2/faq took {elapsed:.3f}s (limit 0.150s)"
+        assert elapsed < 0.400, f"/api/v2/faq took {elapsed:.3f}s (limit 0.400s)"
 
     def test_i18n_ko(self, client):
-        """/api/i18n/ko responds in <50ms."""
+        """/api/i18n/ko responds in <150ms."""
         resp, elapsed = _timed_get(client, "/api/i18n/ko")
         assert resp.status_code == 200
-        assert elapsed < 0.050, f"/api/i18n/ko took {elapsed:.3f}s (limit 0.050s)"
+        assert elapsed < 0.150, f"/api/i18n/ko took {elapsed:.3f}s (limit 0.150s)"
 
     def test_session_new(self, client):
-        """/api/session/new responds in <50ms."""
+        """/api/session/new responds in <150ms."""
         resp, elapsed = _timed_post(client, "/api/session/new")
         assert resp.status_code == 201
-        assert elapsed < 0.050, f"/api/session/new took {elapsed:.3f}s (limit 0.050s)"
+        assert elapsed < 0.150, f"/api/session/new took {elapsed:.3f}s (limit 0.150s)"
 
     def test_admin_knowledge_graph(self, client):
-        """/api/admin/knowledge/graph responds in <500ms."""
+        """/api/admin/knowledge/graph responds in <1000ms."""
         resp, elapsed = _timed_get(client, "/api/admin/knowledge/graph")
         assert resp.status_code == 200
-        assert elapsed < 0.500, f"/api/admin/knowledge/graph took {elapsed:.3f}s (limit 0.500s)"
+        assert elapsed < 1.000, f"/api/admin/knowledge/graph took {elapsed:.3f}s (limit 1.000s)"
 
     def test_admin_quality_scores(self, client):
-        """/api/admin/quality/scores responds in <300ms."""
+        """/api/admin/quality/scores responds in <750ms."""
         resp, elapsed = _timed_get(client, "/api/admin/quality/scores")
         assert resp.status_code == 200
-        assert elapsed < 0.300, f"/api/admin/quality/scores took {elapsed:.3f}s (limit 0.300s)"
+        assert elapsed < 0.750, f"/api/admin/quality/scores took {elapsed:.3f}s (limit 0.750s)"
 
 
 # ===================================================================

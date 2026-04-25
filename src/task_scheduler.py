@@ -558,8 +558,8 @@ def create_default_scheduler(db_path=None):
 
 
 # Lazy imports for default task functions
-from src.backup_manager import BackupManager
-from src.logger_db import ChatLogger
-from src.report_generator import ReportGenerator
-from src.law_updater import LawUpdateScheduler
-from src.faq_quality_checker import FAQQualityChecker
+from src.backup_manager import BackupManager  # noqa: E402
+from src.logger_db import ChatLogger  # noqa: E402
+from src.report_generator import ReportGenerator  # noqa: E402
+from src.law_updater import LawUpdateScheduler  # noqa: E402
+from src.faq_quality_checker import FAQQualityChecker  # noqa: E402

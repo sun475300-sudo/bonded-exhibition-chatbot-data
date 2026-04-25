@@ -4,14 +4,12 @@
 전체/증분 백업, 암호화, 무결성 검증, 스케줄링을 지원한다.
 """
 
-import base64
 import datetime
 import hashlib
 import hmac
 import json
 import logging
 import os
-import shutil
 import threading
 import zipfile
 

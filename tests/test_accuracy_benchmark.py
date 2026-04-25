@@ -141,6 +141,33 @@ class TestBenchmarkRuns:
         assert metrics["total"] == 100
         assert len(metrics["by_category"]) == 10
 
+    def test_real_chatbot_faq_accuracy_regression_floor(self, tmp_path):
+        """Lock in the FAQ-id matching accuracy floor for the real chatbot.
+
+        2026-04 reorg: 키워드 가중치 + 질문 겹침 보너스 + 분기별 키워드 보강으로
+        100/100 정확도 달성. 회귀 차단을 위해 0.95 (95%) 하한선을 보호한다.
+        """
+        from src.chatbot import BondedExhibitionChatbot
+        bench = _fresh_benchmark(tmp_path, BondedExhibitionChatbot())
+        metrics = bench.run_benchmark(GOLDEN_PATH, persist=False)
+        assert metrics["faq_accuracy"] >= 0.95, (
+            f"FAQ accuracy regressed below 95%: {metrics['faq_accuracy']:.3f}\n"
+            f"failures: {[(f['question'][:40], f['expected']['faq_id'], f['actual']['faq_id']) for f in metrics['failures'] if not f['faq_ok']]}"
+        )
+
+    def test_real_chatbot_category_accuracy_regression_floor(self, tmp_path):
+        """카테고리 분류 정확도 하한 테스트.
+
+        2026-04 reorg 후 분류기 + spell_corrector + synonym_resolver 정비로
+        100/100 도달. 회귀 차단을 위해 0.90 (90%) 하한선 보호.
+        """
+        from src.chatbot import BondedExhibitionChatbot
+        bench = _fresh_benchmark(tmp_path, BondedExhibitionChatbot())
+        metrics = bench.run_benchmark(GOLDEN_PATH, persist=False)
+        assert metrics["category_accuracy"] >= 0.90, (
+            f"Category accuracy regressed below 90%: {metrics['category_accuracy']:.3f}"
+        )
+
 
 class TestMetricsStructure:
     def test_metrics_keys_present(self, tmp_path):

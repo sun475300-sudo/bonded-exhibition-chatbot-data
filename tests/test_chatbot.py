@@ -108,3 +108,43 @@ class TestFAQMatching:
         # 최소 카테고리 매칭(+2)으로 매칭될 수 있음
         # 스코어가 1 이상이면 매칭되므로 None이 아닐 수 있다
         assert result is None or isinstance(result, dict)
+
+
+class TestLawSnippetIntegration:
+    """국가법령정보센터 동기화 결과(law_snippets)가 답변에 반영되는지 검증."""
+
+    def test_collect_legal_guide_uses_snippet(self, chatbot):
+        faq_match = {
+            "legal_basis": ["관세법 제190조"],
+            "law_snippets": {
+                "관세법 제190조": {
+                    "content": "[법령센터 동기화] 보세전시장 최신 본문",
+                    "law_name": "관세법",
+                    "article": "제190조",
+                    "fetched_at": "2026-04-25T00:00:00",
+                }
+            },
+        }
+        guide = chatbot._collect_legal_guide(faq_match)
+        assert any("[법령센터 동기화]" in g for g in guide)
+
+    def test_collect_legal_guide_falls_back_to_kg(self, chatbot):
+        # snippets 없으면 KnowledgeGraph 폴백 (없을 수도 있으므로 빈 결과 허용)
+        faq_match = {"legal_basis": ["관세법 제190조"]}
+        guide = chatbot._collect_legal_guide(faq_match)
+        assert isinstance(guide, list)
+
+    def test_reload_returns_stats(self, chatbot):
+        """reload() 가 데이터 카운트를 포함한 dict 를 반환한다.
+
+        실제 data/faq.json 에 쓰는 시나리오는 conftest 백업과 충돌 위험이
+        있어 통합 테스트 대신 호출 시그니처와 반환 형태만 검증한다.
+        """
+        stats = chatbot.reload()
+        assert isinstance(stats, dict)
+        assert "faq_items" in stats
+        assert "legal_references" in stats
+        assert stats["faq_items"] >= 1
+        # reload 후에도 정상 동작
+        assert chatbot.faq_items
+        assert chatbot.config is not None

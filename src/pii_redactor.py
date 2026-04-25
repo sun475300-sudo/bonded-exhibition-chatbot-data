@@ -13,18 +13,22 @@ class PIIRedactor:
 
     def __init__(self, enabled: bool = True):
         """초기화.
-        
+
         Args:
             enabled: PII 모듈 활성화 여부
         """
         self.enabled = enabled
 
-        # 우선순위가 높은 패턴부터 평가하기 위해 순서대로 정의
+        # 우선순위가 높은 패턴부터 평가하기 위해 순서대로 정의.
+        # 한글이 인접해도 매칭되도록 \b 대신 (?<!\d) / (?!\d) 사용.
         self.patterns = {
-            "jumin": re.compile(r'\b\d{2}(?:0[1-9]|1[0-2])(?:0[1-9]|[1,2][0-9]|3[0,1])[- ]?[1-4]\d{6}\b'),
+            "jumin": re.compile(r'(?<!\d)\d{2}(?:0[1-9]|1[0-2])(?:0[1-9]|[12][0-9]|3[01])[- ]?[1-4]\d{6}(?!\d)'),
             "email": re.compile(r'[a-zA-Z0-9_.+-]+@[a-zA-Z0-9-]+\.[a-zA-Z0-9-.]+'),
-            "phone": re.compile(r'\b01[016789][-.\s]?\d{3,4}[-.\s]?\d{4}\b|\b0[2-9]\d{0,1}[-.\s]?\d{3,4}[-.\s]?\d{4}\b'),
-            "credit_card": re.compile(r'\b(?:[0-9]{4}[-.\s]?){3}[0-9]{3,4}\b')
+            "phone": re.compile(
+                r'(?<!\d)01[016789][-.\s]?\d{3,4}[-.\s]?\d{4}(?!\d)'
+                r'|(?<!\d)0[2-9]\d{0,1}[-.\s]?\d{3,4}[-.\s]?\d{4}(?!\d)'
+            ),
+            "credit_card": re.compile(r'(?<!\d)(?:[0-9]{4}[-.\s]?){3}[0-9]{3,4}(?!\d)'),
         }
 
     def redact(self, text: str) -> str:

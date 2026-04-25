@@ -60,7 +60,7 @@ KNOWN_TERMS: set[str] = {
     # ── GENERAL (일반 개념) ──
     "보세전시장", "보세구역", "보세창고", "외국물품", "내국물품",
     "제도", "정의", "개념", "뜻", "무엇", "차이", "비교", "구분",
-    "이용", "자격", "국산",
+    "이용", "자격", "국산", "물품", "물건", "샘플", "홍보", "촬영",
 
     # ── LICENSE (특허·운영) ──
     "특허", "특허기간", "특허신청", "특허장소", "특허연장",
@@ -250,13 +250,23 @@ def correct_query(query: str) -> tuple[str, list[dict]]:
             corrected_tokens.append(token)
             continue
 
+        # 토큰이 도메인 용어로 시작하면 한국어 조사/어미가 붙은 형태로 보고
+        # 교정 대상에서 제외한다. 예: "신고해야" → "신고서" 로 잘못 바뀌던 사례.
+        starts_with_known = any(
+            len(known) >= 2 and token.startswith(known) for known in KNOWN_TERMS
+        )
+        if starts_with_known:
+            corrected_tokens.append(token)
+            continue
+
         suggestion = correct_term(token)
         if suggestion is not None and suggestion != token:
             dist = levenshtein_distance(token, suggestion)
-            # 공통 문자 비율이 50% 미만이면 무관한 단어로 판단하여 교정 생략
+            # 공통 문자 비율이 60% 미만이면 무관한 단어로 판단하여 교정 생략
+            # (이전 50%는 "물품"→"식품"과 같은 의미 다른 단어 오교정을 막지 못함)
             common_chars = sum(1 for a, b in zip(token, suggestion) if a == b)
             max_len = max(len(token), len(suggestion))
-            if max_len > 0 and common_chars / max_len < 0.5:
+            if max_len > 0 and common_chars / max_len < 0.6:
                 corrected_tokens.append(token)
                 continue
             corrections.append({
