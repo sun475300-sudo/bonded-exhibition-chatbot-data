@@ -5,7 +5,6 @@ All operations are thread-safe.
 """
 
 import threading
-import time
 import math
 from collections import defaultdict
 

@@ -6,10 +6,16 @@ on:
   pull_request:
     branches: [main]
 
+permissions:
+  contents: read
+  pull-requests: write
+  issues: write
+
 jobs:
   test:
     runs-on: ubuntu-latest
     strategy:
+      fail-fast: false
       matrix:
         python-version: ["3.10", "3.11"]
 
@@ -33,11 +39,21 @@ jobs:
 
       - name: 테스트
         run: |
-          python -m pytest tests/ -q --tb=short \
+          set -o pipefail
+          python -m pytest tests/ -v --tb=short -ra \
             --ignore=tests/test_e2e.py \
             --ignore=tests/test_full_integration.py \
             --ignore=tests/test_performance.py \
-            -x
+            -x 2>&1 | tee pytest-output.log
+        continue-on-error: false
+
+      - name: 실패 로그 요약 (Job Summary 게시)
+        if: failure()
+        run: |
+          echo "## pytest 실패 요약 (Python ${{ matrix.python-version }})" >> "$GITHUB_STEP_SUMMARY"
+          echo '```' >> "$GITHUB_STEP_SUMMARY"
+          tail -n 200 pytest-output.log >> "$GITHUB_STEP_SUMMARY" || true
+          echo '```' >> "$GITHUB_STEP_SUMMARY"
 
       - name: 커버리지 리포트
         if: matrix.python-version == '3.11'
@@ -61,6 +77,18 @@ jobs:
       - name: 컨테이너 헬스 체크
         run: |
           docker run -d --name test-chatbot -p 8080:8080 bonded-chatbot:test
-          sleep 10
-          curl -f http://localhost:8080/health || exit 1
+          # Wait for the gunicorn worker to bind. Up to 30s of 1-second polls.
+          for i in $(seq 1 30); do
+            if curl -fs http://localhost:8080/api/health >/dev/null; then
+              echo "health endpoint up after ${i}s"
+              break
+            fi
+            sleep 1
+          done
+          # Final assertion (with output for debugging on failure).
+          curl -f http://localhost:8080/api/health || {
+            echo "--- container logs ---"
+            docker logs test-chatbot || true
+            exit 1
+          }
           docker stop test-chatbot

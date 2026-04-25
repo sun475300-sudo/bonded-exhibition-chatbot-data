@@ -4,8 +4,7 @@ import pytest
 
 # VectorSearchEngine은 sentence-transformers가 설치되었을 때만 테스트
 try:
-    from src.vector_search import VectorSearchEngine
-    HAS_EMBEDDINGS = True
+    from src.vector_search import VectorSearchEngine, HAS_EMBEDDINGS
 except ImportError:
     HAS_EMBEDDINGS = False
 

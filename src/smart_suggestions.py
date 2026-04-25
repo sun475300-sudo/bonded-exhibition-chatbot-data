@@ -8,7 +8,6 @@ from __future__ import annotations
 
 from typing import Any
 
-from src.classifier import classify_query, CATEGORY_KEYWORDS
 from src.knowledge_graph import KnowledgeGraph
 from src.question_cluster import QuestionClusterer
 from src.related_faq import RelatedFAQFinder

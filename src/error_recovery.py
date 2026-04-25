@@ -10,8 +10,7 @@ import sqlite3
 import threading
 import time
 import traceback
-from collections import defaultdict
-from datetime import datetime, timedelta
+from datetime import datetime
 
 
 class CircuitState(enum.Enum):
@@ -62,7 +61,7 @@ class CircuitBreaker:
             result = func(*args, **kwargs)
             self._on_success()
             return result
-        except Exception as e:
+        except Exception:
             self._on_failure()
             raise
 

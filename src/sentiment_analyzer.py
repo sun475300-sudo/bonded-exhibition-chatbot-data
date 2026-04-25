@@ -7,7 +7,6 @@
 import os
 import re
 import sqlite3
-import time
 import threading
 from datetime import datetime
 

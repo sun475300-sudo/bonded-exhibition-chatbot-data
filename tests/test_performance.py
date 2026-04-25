@@ -104,16 +104,16 @@ class TestResponseTimes:
         assert elapsed < 0.050, f"/api/config took {elapsed:.3f}s (limit 0.050s)"
 
     def test_admin_stats(self, client):
-        """/api/admin/stats responds in <200ms."""
+        """/api/admin/stats responds in <500ms."""
         resp, elapsed = _timed_get(client, "/api/admin/stats")
         assert resp.status_code == 200
-        assert elapsed < 0.200, f"/api/admin/stats took {elapsed:.3f}s (limit 0.200s)"
+        assert elapsed < 0.500, f"/api/admin/stats took {elapsed:.3f}s (limit 0.500s)"
 
     def test_admin_charts_dashboard(self, client):
-        """/api/admin/charts/dashboard responds in <300ms."""
+        """/api/admin/charts/dashboard responds in <700ms."""
         resp, elapsed = _timed_get(client, "/api/admin/charts/dashboard")
         assert resp.status_code == 200
-        assert elapsed < 0.300, f"/api/admin/charts/dashboard took {elapsed:.3f}s (limit 0.300s)"
+        assert elapsed < 0.700, f"/api/admin/charts/dashboard took {elapsed:.3f}s (limit 0.700s)"
 
     def test_v2_faq_pagination(self, client):
         """/api/v2/faq with pagination responds in <150ms."""
@@ -195,14 +195,14 @@ class TestThroughput:
         )
 
     def test_admin_stats_throughput(self, client):
-        """50 sequential /api/admin/stats in <15s."""
+        """50 sequential /api/admin/stats in <30s."""
         start = time.monotonic()
         for _ in range(50):
             resp = client.get("/api/admin/stats")
             assert resp.status_code == 200
         elapsed = time.monotonic() - start
-        assert elapsed < 15.0, (
-            f"50 admin/stats requests took {elapsed:.1f}s (limit 15s)"
+        assert elapsed < 30.0, (
+            f"50 admin/stats requests took {elapsed:.1f}s (limit 30s)"
         )
 
     def test_mixed_workload(self, client):

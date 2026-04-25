@@ -39,6 +39,7 @@ from src.vector_search import VectorSearchEngine
 from src.llm_fallback import generate_llm_response_with_disclaimer, is_llm_available
 from src.pii_redactor import PIIRedactor
 from src.prompt_defender import PromptDefender
+from src.legal_reference_provider import get_legal_reference_provider
 
 logger = logging.getLogger(__name__)
 
@@ -99,6 +100,13 @@ class BondedExhibitionChatbot:
         # 보안 애드온 (Phase 62-63)
         self.pii_redactor = PIIRedactor(enabled=True)
         self.prompt_defender = PromptDefender(enabled=True)
+
+        # 법령 근거 제공자 (국가법령정보센터 동기화 캐시 + JSON 파일 hot-reload)
+        try:
+            self.legal_provider = get_legal_reference_provider()
+        except Exception as e:
+            logger.warning(f"LegalReferenceProvider unavailable: {e}")
+            self.legal_provider = None
 
         # 지식 그래프 (선택적)
         self.knowledge_graph = None
@@ -495,16 +503,25 @@ class BondedExhibitionChatbot:
                     risk_level, policy_decision, escalation_triggered,
                 )
 
-            # 법령 가이드 요약 추출 (지식 그래프 연계)
+            # 법령 가이드 요약 추출 (국가법령정보센터 동기화 + 지식 그래프 연계)
+            legal_basis_list = faq_match.get("legal_basis", []) or []
             legal_guide = []
+            if self.legal_provider is not None:
+                # 매 요청마다 변경된 legal_references.json/law_sync 캐시를 반영
+                self.legal_provider.refresh_if_stale()
+                legal_guide = list(self.legal_provider.build_legal_guide(legal_basis_list))
             if self.knowledge_graph:
-                for basis in faq_match.get("legal_basis", []):
+                seen = set(legal_guide)
+                for basis in legal_basis_list:
                     law_node_id = f"law_{basis}"
                     if law_node_id in self.knowledge_graph.nodes:
                         node_data = self.knowledge_graph.nodes[law_node_id].get("data", {})
                         summary = node_data.get("summary")
                         if summary:
-                            legal_guide.append(f"{basis}: {summary}")
+                            line = f"{basis}: {summary}"
+                            if line not in seen:
+                                legal_guide.append(line)
+                                seen.add(line)
 
             response = build_response(
                 topic=category_name,
@@ -654,7 +671,6 @@ class BondedExhibitionChatbot:
 
     def _build_escalation_response_from_policy(self, policy_decision: dict) -> str:
         """정책 평가 결과로부터 에스컬레이션 응답을 생성한다."""
-        escalation_target = policy_decision.get("escalation_target")
         risk_level = policy_decision.get("risk_level", "high")
         disclaimers = policy_decision.get("disclaimers", [])
 

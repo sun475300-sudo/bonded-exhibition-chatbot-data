@@ -6,7 +6,6 @@ FAQ 항목의 임베딩을 사전 계산하고, 사용자 질문의 코사인 �
 from __future__ import annotations
 
 import hashlib
-import os
 from functools import lru_cache
 
 try:
@@ -14,7 +13,10 @@ try:
     from sentence_transformers import SentenceTransformer
     HAS_EMBEDDINGS = True
 except ImportError:
-    import numpy as np  # numpy는 이미 설치됨
+    try:
+        import numpy as np  # numpy 만 있는 경우에도 DummyModel 동작 가능
+    except ImportError:
+        np = None  # type: ignore
     SentenceTransformer = None
     HAS_EMBEDDINGS = False
 
@@ -43,13 +45,20 @@ class VectorSearchEngine:
 
         Args:
             faq_items: FAQ 항목 리스트. 각 항목에 question, keywords, answer, category 필드 필요.
+
+        Raises:
+            ImportError: numpy가 설치되지 않은 경우 (벡터 연산 불가).
         """
+        if np is None:
+            raise ImportError(
+                "numpy 가 필요합니다. 설치: pip install numpy"
+            )
         self.faq_items = faq_items
         if HAS_EMBEDDINGS and SentenceTransformer:
             self.model = SentenceTransformer("sentence-transformers/paraphrase-multilingual-MiniLM-L12-v2")
         else:
             self.model = DummyModel()
-            
+
         self.embeddings = None
         self.embedding_cache = {}  # 동일 질문 재인코딩 방지
 

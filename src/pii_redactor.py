@@ -13,7 +13,7 @@ class PIIRedactor:
 
     def __init__(self, enabled: bool = True):
         """초기화.
-        
+
         Args:
             enabled: PII 모듈 활성화 여부
         """
@@ -23,7 +23,7 @@ class PIIRedactor:
         self.patterns = {
             "jumin": re.compile(r'\b\d{2}(?:0[1-9]|1[0-2])(?:0[1-9]|[1,2][0-9]|3[0,1])[- ]?[1-4]\d{6}\b'),
             "email": re.compile(r'[a-zA-Z0-9_.+-]+@[a-zA-Z0-9-]+\.[a-zA-Z0-9-.]+'),
-            "phone": re.compile(r'\b01[016789][-.\s]?\d{3,4}[-.\s]?\d{4}\b|\b0[2-9]\d{0,1}[-.\s]?\d{3,4}[-.\s]?\d{4}\b'),
+            "phone": re.compile(r'(?<!\d)01[016789][-.\s]?\d{3,4}[-.\s]?\d{4}(?!\d)|(?<!\d)0[2-9]\d{0,1}[-.\s]?\d{3,4}[-.\s]?\d{4}(?!\d)'),
             "credit_card": re.compile(r'\b(?:[0-9]{4}[-.\s]?){3}[0-9]{3,4}\b')
         }
 
@@ -40,22 +40,8 @@ class PIIRedactor:
             return text
 
         redacted_text = text
-        
-        # 전화번호 패턴 처리 (경계 조건 완화)
-        phone_patterns = [
-            re.compile(r'010\d{8}'),
-            re.compile(r'01[016789][-.\s]?\d{3,4}[-.\s]?\d{4}'),
-            re.compile(r'0[2-9]\d{0,1}[-.\s]?\d{3,4}[-.\s]?\d{4}')
-        ]
-        
-        # 주민번호
-        redacted_text = self.patterns["jumin"].sub("[REDACTED_JUMIN]", redacted_text)
-        # 이메일
-        redacted_text = self.patterns["email"].sub("[REDACTED_EMAIL]", redacted_text)
-        # 전화번호
-        for p in phone_patterns:
-            redacted_text = p.sub("[REDACTED_PHONE]", redacted_text)
-        # 카드번호
-        redacted_text = self.patterns["credit_card"].sub("[REDACTED_CREDIT_CARD]", redacted_text)
+        for pii_type, pattern in self.patterns.items():
+            replacement = f"[REDACTED_{pii_type.upper()}]"
+            redacted_text = pattern.sub(replacement, redacted_text)
 
         return redacted_text
