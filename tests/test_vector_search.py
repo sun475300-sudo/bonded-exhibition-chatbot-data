@@ -2,12 +2,10 @@
 
 import pytest
 
-# VectorSearchEngine은 sentence-transformers가 설치되었을 때만 테스트
-try:
-    from src.vector_search import VectorSearchEngine
-    HAS_EMBEDDINGS = True
-except ImportError:
-    HAS_EMBEDDINGS = False
+# VectorSearchEngine은 sentence-transformers가 설치되었을 때만 테스트.
+# vector_search 모듈은 항상 import 가능하지만, 실제 임베딩 라이브러리가
+# 없으면 클래스 인스턴스화 시 ImportError를 던지므로 런타임 플래그를 사용.
+from src.vector_search import VectorSearchEngine, HAS_EMBEDDINGS  # noqa: E402
 
 
 @pytest.fixture

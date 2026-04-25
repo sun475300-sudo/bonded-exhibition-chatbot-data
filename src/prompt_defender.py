@@ -1,6 +1,6 @@
 """Prompt Injection Defender 모듈 (Phase 63).
 
-사용자의 입력에서 SQL 인젝션, XSS(크로스 사이트 스크립팅), 
+사용자의 입력에서 SQL 인젝션, XSS(크로스 사이트 스크립팅),
 또는 LLM 시스템 프롬프트를 탈취하려는 시도를 감지하여 차단합니다.
 """
 from __future__ import annotations
@@ -14,13 +14,31 @@ class PromptDefender:
     def __init__(self, enabled: bool = True):
         self.enabled = enabled
 
-        # XSS, SQLi, 시스템 프롬프트 유출 시도 패턴
+        # XSS, SQLi, 시스템 프롬프트 유출 시도 패턴.
+        # 주의: 이전 버전은 alternation 메타문자 `|` 를 `\|` 로 잘못 이스케이프하여
+        # 핵심 SQLi 패턴이 전혀 매칭되지 않았다. 또한 자연어 질의("how to drop a
+        # database table?") 가 오탐되지 않도록 SQL 구문 구조(키워드 사이 토큰을
+        # 식별자 한두 개로 제한)를 활용한다.
         self.blacklist_patterns = [
             re.compile(r'(?i)<script\b[^<]*(?:(?!<\/script>)<[^<]*)*<\/script>'),  # XSS
-            re.compile(r'(?i)(?:select\|insert\|update\|delete\|drop\|truncate\|union\|exec)\s+.*\s+(?:from\|into\|table)', re.IGNORECASE), # SQLi (기본 형태)
-            re.compile(r'(?i)(--|\bDELETE\b|\bDROP\b|\bINSERT\b|\bUPDATE\b)\s+'), # SQLi (명령어)
-            re.compile(r'(?i)(ignore previous instructions|너의 지시사항|이전 프롬프트 무시|system prompt|jailbreak|DAN\b|개발자 모드)'), # LLM Prompt Injection
-            re.compile(r'(?i)(<\s*(?:iframe|object|embed|applet|meta)[^>]*>)'), # HTML injection
+            # SELECT ... FROM <ident>: 사이에 식별자/문장부호만 허용
+            re.compile(r'(?i)\bselect\b[\s\w*,.`"\'()]+\bfrom\b\s+[`"\']?\w'),
+            # DROP TABLE <ident> / DROP DATABASE <ident> (관사 "a/an/the" 직접 인접 시 제외)
+            re.compile(
+                r'(?i)\bdrop\s+(?:table|database|schema|view|index)\s+(?!a\b|an\b|the\b)[`"\']?\w'
+            ),
+            re.compile(r'(?i)\btruncate\s+table\s+\w'),
+            re.compile(r'(?i)\binsert\s+into\s+\w'),
+            re.compile(r'(?i)\bdelete\s+from\s+\w'),
+            re.compile(r'(?i)\bupdate\s+\w+\s+set\b'),
+            re.compile(r'(?i)\bunion\s+(?:all\s+)?select\b'),
+            # SQL 주석 (라인 끝 또는 공백 연속): "WHERE 1=1 --"
+            re.compile(r'--\s*(?:$|\r|\n|\s{2,})'),
+            re.compile(  # LLM 프롬프트 인젝션
+                r'(?i)(ignore previous instructions|너의 지시사항|이전 프롬프트 무시'
+                r'|system prompt|jailbreak|DAN\b|개발자 모드)'
+            ),
+            re.compile(r'(?i)(<\s*(?:iframe|object|embed|applet|meta)[^>]*>)'),  # HTML injection
         ]
 
     def is_malicious(self, text: str) -> bool:
