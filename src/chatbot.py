@@ -489,12 +489,20 @@ class BondedExhibitionChatbot:
             categories = ["GENERAL"]
         primary_category = categories[0]
 
-        # mapped_category가 더 우선도가 높으면 사용
-        # 단, 의도 분류 신뢰도가 임계값(0.3) 이상인 경우에만 적용
-        # 신뢰도가 낙으면 기존 키워드 기반 분류를 유지하여 오매칭을 방지
-        INTENT_CONFIDENCE_THRESHOLD = 0.3
-        if mapped_category != "GENERAL" and intent_confidence >= INTENT_CONFIDENCE_THRESHOLD:
-            primary_category = mapped_category
+        # 의도 분류 결과로 키워드 기반 1차 분류를 보강한다.
+        # - 키워드 분류가 GENERAL 인 경우(즉, 도메인 키워드를 못 찾았을 때)에만
+        #   의도 분류의 mapped_category 로 대체한다.
+        # - 키워드 분류가 이미 도메인 카테고리를 줬다면 신뢰도가 매우 높을(>=0.5)
+        #   때만 의도 분류로 덮어쓴다. 의도 분류는 example_queries 기반 토큰
+        #   매칭으로 노이즈가 많기 때문에 소수의 일치만으로 키워드 결과를
+        #   바꾸지 않도록 보호한다.
+        INTENT_CONFIDENCE_THRESHOLD_LOW = 0.3
+        INTENT_CONFIDENCE_THRESHOLD_HIGH = 0.5
+        if mapped_category != "GENERAL":
+            if primary_category == "GENERAL" and intent_confidence >= INTENT_CONFIDENCE_THRESHOLD_LOW:
+                primary_category = mapped_category
+            elif intent_confidence >= INTENT_CONFIDENCE_THRESHOLD_HIGH:
+                primary_category = mapped_category
 
         # 5단계: FAQ 매칭
         escalation = check_escalation(processed_query)

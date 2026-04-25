@@ -234,11 +234,81 @@ class IntentClassifier:
 
         return (best_intent, best_score)
 
+    # intent_id 토큰 → 카테고리 매핑 (구체적인 도메인이 먼저 평가되도록 정렬).
+    # 예: "tasting_food" 는 IMPORT_EXPORT 보다 FOOD_TASTING 으로 분류되어야 한다.
+    _INTENT_ID_CATEGORY_RULES = (
+        # (토큰 키워드, 카테고리)
+        ("tasting", "FOOD_TASTING"),
+        ("food", "FOOD_TASTING"),
+        ("sample", "SAMPLE"),
+        ("gift", "SAMPLE"),
+        ("demo", "SAMPLE"),
+        ("penalty", "PENALTIES"),
+        ("noncompliance", "PENALTIES"),
+        ("loss_or_damage", "PENALTIES"),
+        ("sale", "SALES"),
+        ("domestic_release", "SALES"),
+        ("permit", "LICENSE"),
+        ("operator", "LICENSE"),
+        ("eligibility", "LICENSE"),
+        ("required_documents", "DOCUMENTS"),
+        ("inventory", "DOCUMENTS"),
+        ("declaration", "IMPORT_EXPORT"),
+        ("inspection", "IMPORT_EXPORT"),
+        ("inbound", "IMPORT_EXPORT"),
+        ("outbound", "IMPORT_EXPORT"),
+        ("reexport", "IMPORT_EXPORT"),
+        ("transfer", "IMPORT_EXPORT"),
+        ("display", "EXHIBITION"),
+        ("exhibition_hall", "EXHIBITION"),
+        ("facility", "EXHIBITION"),
+        ("definition", "GENERAL"),
+        ("comprehensive", "GENERAL"),
+        ("difference", "GENERAL"),
+        ("legal_basis", "GENERAL"),
+        ("contact", "CONTACT"),
+        ("support", "CONTACT"),
+    )
+
+    # 한국어 키워드 (domain/description fallback). 더 구체적인 카테고리부터.
+    _DOMAIN_CATEGORY_RULES = (
+        ("시식", "FOOD_TASTING"),
+        ("식품", "FOOD_TASTING"),
+        ("Food", "FOOD_TASTING"),
+        ("Tasting", "FOOD_TASTING"),
+        ("견본", "SAMPLE"),
+        ("샘플", "SAMPLE"),
+        ("Sample", "SAMPLE"),
+        ("벌칙", "PENALTIES"),
+        ("제재", "PENALTIES"),
+        ("처분", "PENALTIES"),
+        ("Penalty", "PENALTIES"),
+        ("판매", "SALES"),
+        ("Sales", "SALES"),
+        ("특허", "LICENSE"),
+        ("License", "LICENSE"),
+        ("Permit", "LICENSE"),
+        ("서류", "DOCUMENTS"),
+        ("문서", "DOCUMENTS"),
+        ("Document", "DOCUMENTS"),
+        ("반입", "IMPORT_EXPORT"),
+        ("반출", "IMPORT_EXPORT"),
+        ("Import", "IMPORT_EXPORT"),
+        ("Export", "IMPORT_EXPORT"),
+        ("전시", "EXHIBITION"),
+        ("Exhibition", "EXHIBITION"),
+        ("문의", "CONTACT"),
+        ("연락", "CONTACT"),
+        ("Support", "CONTACT"),
+        ("제도", "GENERAL"),
+        ("자격", "GENERAL"),
+    )
+
     def get_intent_category(self, intent_id: str) -> str:
         """의도 ID를 기존 10-category 시스템으로 매핑한다.
 
         Args:
-            intent_id: 의도 ID (예: "sysqual_001", "bonded_exhibition_definition")
+            intent_id: 의도 ID (예: "tasting_food", "permit_application_process")
 
         Returns:
             기존 카테고리 코드 (예: "GENERAL", "LICENSE")
@@ -247,34 +317,20 @@ class IntentClassifier:
             return "GENERAL"
 
         intent = self.intents[intent_id]
-        # 'domain' 필드가 없으면 intent_id 또는 description으로 카테고리 추론
-        domain = intent.get("domain", "")
-        if not domain:
-            # intent_id 또는 description에서 카테고리 추론
-            description = intent.get("description", "")
-            domain = intent_id + " " + description
+        intent_id_lower = intent_id.lower()
 
-        # domain 문자열에서 카테고리 매핑
-        if "System & Qualification" in domain or "제도" in domain or "자격" in domain:
+        # 1) intent_id 토큰 기반 매핑 (가장 신뢰도 높음)
+        for token, category in self._INTENT_ID_CATEGORY_RULES:
+            if token in intent_id_lower:
+                return category
+
+        # 2) domain / description 기반 폴백
+        haystack = (intent.get("domain", "") + " " + intent.get("description", "")).strip()
+        if not haystack:
             return "GENERAL"
-        elif "License" in domain or "특허" in domain:
-            return "LICENSE"
-        elif "Import" in domain or "Export" in domain or "반입" in domain or "반출" in domain:
-            return "IMPORT_EXPORT"
-        elif "Exhibition" in domain or "전시" in domain:
-            return "EXHIBITION"
-        elif "Sales" in domain or "판매" in domain:
-            return "SALES"
-        elif "Sample" in domain or "견본" in domain:
-            return "SAMPLE"
-        elif "Food" in domain or "식품" in domain or "시식" in domain:
-            return "FOOD_TASTING"
-        elif "Document" in domain or "서류" in domain or "문서" in domain:
-            return "DOCUMENTS"
-        elif "Penalty" in domain or "벌칙" in domain or "제재" in domain:
-            return "PENALTIES"
-        elif "Support" in domain or "문의" in domain or "연락" in domain:
-            return "CONTACT"
+        for token, category in self._DOMAIN_CATEGORY_RULES:
+            if token in haystack:
+                return category
 
         return "GENERAL"
 
