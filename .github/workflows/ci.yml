@@ -55,26 +55,6 @@ jobs:
           tail -n 200 pytest-output.log >> "$GITHUB_STEP_SUMMARY" || true
           echo '```' >> "$GITHUB_STEP_SUMMARY"
 
-      - name: 실패 로그 PR 코멘트 게시 (디버깅)
-        if: failure() && github.event_name == 'pull_request' && matrix.python-version == '3.11'
-        env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          PR_NUMBER: ${{ github.event.pull_request.number }}
-          REPO: ${{ github.repository }}
-        run: |
-          {
-            echo "### 🔴 CI test (3.11) 실패 로그 (마지막 200줄)"
-            echo
-            echo '```'
-            tail -n 200 pytest-output.log || true
-            echo '```'
-          } > comment-body.md
-          curl -sf -X POST \
-            -H "Authorization: Bearer $GH_TOKEN" \
-            -H "Accept: application/vnd.github+json" \
-            "https://api.github.com/repos/$REPO/issues/$PR_NUMBER/comments" \
-            -d "$(jq -Rs '{body: .}' comment-body.md)" || echo "comment post failed"
-
       - name: 커버리지 리포트
         if: matrix.python-version == '3.11'
         run: |
@@ -97,6 +77,18 @@ jobs:
       - name: 컨테이너 헬스 체크
         run: |
           docker run -d --name test-chatbot -p 8080:8080 bonded-chatbot:test
-          sleep 10
-          curl -f http://localhost:8080/health || exit 1
+          # Wait for the gunicorn worker to bind. Up to 30s of 1-second polls.
+          for i in $(seq 1 30); do
+            if curl -fs http://localhost:8080/api/health >/dev/null; then
+              echo "health endpoint up after ${i}s"
+              break
+            fi
+            sleep 1
+          done
+          # Final assertion (with output for debugging on failure).
+          curl -f http://localhost:8080/api/health || {
+            echo "--- container logs ---"
+            docker logs test-chatbot || true
+            exit 1
+          }
           docker stop test-chatbot
