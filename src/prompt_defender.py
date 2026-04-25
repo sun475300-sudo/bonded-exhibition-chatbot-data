@@ -1,6 +1,6 @@
 """Prompt Injection Defender 모듈 (Phase 63).
 
-사용자의 입력에서 SQL 인젝션, XSS(크로스 사이트 스크립팅), 
+사용자의 입력에서 SQL 인젝션, XSS(크로스 사이트 스크립팅),
 또는 LLM 시스템 프롬프트를 탈취하려는 시도를 감지하여 차단합니다.
 """
 from __future__ import annotations
@@ -17,10 +17,16 @@ class PromptDefender:
         # XSS, SQLi, 시스템 프롬프트 유출 시도 패턴
         self.blacklist_patterns = [
             re.compile(r'(?i)<script\b[^<]*(?:(?!<\/script>)<[^<]*)*<\/script>'),  # XSS
-            re.compile(r'(?i)(?:select\|insert\|update\|delete\|drop\|truncate\|union\|exec)\s+.*\s+(?:from\|into\|table)', re.IGNORECASE), # SQLi (기본 형태)
-            re.compile(r'(?i)(--|\bDELETE\b|\bDROP\b|\bINSERT\b|\bUPDATE\b)\s+'), # SQLi (명령어)
-            re.compile(r'(?i)(ignore previous instructions|너의 지시사항|이전 프롬프트 무시|system prompt|jailbreak|DAN\b|개발자 모드)'), # LLM Prompt Injection
-            re.compile(r'(?i)(<\s*(?:iframe|object|embed|applet|meta)[^>]*>)'), # HTML injection
+            # SQLi: SQL 동사가 SQL 명사를 *바로* 받는 형태(또는 `*` 포함)만 매칭.
+            # "drop a database table?" 같은 자연어는 사이에 관사가 들어가므로 제외.
+            re.compile(r'(?i)\b(?:select|delete|update)\s+(?:\*|\w+\s*,?\s*)+\s+from\b'),
+            re.compile(r'(?i)\b(?:drop|truncate)\s+(?:table|database|schema|index)\b'),
+            re.compile(r'(?i)\binsert\s+into\b'),
+            re.compile(r'(?i)\bunion\s+(?:all\s+)?select\b'),
+            # 라인 주석(`--`) 또는 명령어 종결 형태(`SELECT * FROM ... --`).
+            re.compile(r'--\s*$|--\s+\S'),
+            re.compile(r'(?i)(ignore previous instructions|너의 지시사항|이전 프롬프트 무시|system prompt|jailbreak|DAN\b|개발자 모드)'),
+            re.compile(r'(?i)(<\s*(?:iframe|object|embed|applet|meta)[^>]*>)'),  # HTML injection
         ]
 
     def is_malicious(self, text: str) -> bool:

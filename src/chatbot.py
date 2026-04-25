@@ -108,6 +108,15 @@ class BondedExhibitionChatbot:
         except Exception:
             pass
 
+        # 국가법령정보센터 캐시 브리지: 응답에 최신 조문 본문/동기화 시각을 노출.
+        # 캐시 조회만 수행하므로 외부 API 호출 비용은 발생하지 않는다.
+        self.law_cache = None
+        try:
+            from src.law_cache import get_law_cache_bridge
+            self.law_cache = get_law_cache_bridge()
+        except Exception as e:
+            logger.warning("LawCacheBridge unavailable: %s", e)
+
     @staticmethod
     def _normalize_faq_items(items: list[dict]) -> list[dict]:
         """FAQ 항목을 정규화하여 신/구 포맷 모두 호환되도록 한다.
@@ -158,7 +167,7 @@ class BondedExhibitionChatbot:
         """질문과 카테고리에 매칭되는 FAQ 항목을 찾는다.
 
         파이프라인:
-        1. 키워드 매칭
+        1. 키워드 매칭 (구문/길이 기반 가중치)
         2. TF-IDF 유사도
         3. BM25 랭킹
         4. 벡터 검색 (의미론적 매칭)
@@ -166,28 +175,53 @@ class BondedExhibitionChatbot:
         """
         query_lower = normalize_query(query)
         best_match = None
-        best_score = 0
+        best_score = 0.0
+        best_phrase_hits = 0
         best_keyword_hits = 0
 
-        # 1단계: 키워드 매칭
+        # 1단계: 키워드 매칭. 다어절 구문(phrase)·긴 키워드에 가중치를 부여해
+        # 짧은 단어 1~2개만 중복되는 항목이 우선 매칭되는 문제를 줄인다.
         for item in self.faq_items:
-            score = 0
+            score = 0.0
             keyword_hits = 0
+            phrase_hits = 0
+            specificity = 0.0
 
             if item.get("category") == category:
                 score += CATEGORY_BONUS
 
             keywords = item.get("keywords", [])
             for kw in keywords:
-                if kw.lower() in query_lower:
-                    score += 1
+                kw_norm = kw.lower().strip()
+                if not kw_norm:
+                    continue
+                if kw_norm in query_lower:
                     keyword_hits += 1
+                    # 공백을 포함한 구문은 더 구체적이므로 가중치 +1
+                    if " " in kw_norm:
+                        phrase_hits += 1
+                        score += 2.0
+                    else:
+                        score += 1.0
+                    # 길이 기반 추가 가중치 (3자 이상이면 +0.3, 5자 이상이면 +0.6)
+                    if len(kw_norm) >= 5:
+                        specificity += 0.6
+                    elif len(kw_norm) >= 3:
+                        specificity += 0.3
 
-            if score > best_score or (score == best_score and keyword_hits > best_keyword_hits):
+            score += specificity
+
+            # 우선순위: (1) 점수가 더 높은 항목 (2) 동점이면 구문 매칭이 더 많은 항목
+            if score > best_score or (
+                abs(score - best_score) < 1e-6 and phrase_hits > best_phrase_hits
+            ):
                 best_score = score
                 best_match = item
+                best_phrase_hits = phrase_hits
                 best_keyword_hits = keyword_hits
 
+        # 카테고리 보너스(2)만 적용된 경우(점수 정확히 2)는 의미 있는 매칭이
+        # 아니므로 임계값(3) 이상 + 키워드 1회 이상이라는 기존 조건만 사용한다.
         if best_score >= KEYWORD_SCORE_THRESHOLD and best_keyword_hits >= MIN_KEYWORD_HITS:
             return best_match
 
@@ -405,11 +439,16 @@ class BondedExhibitionChatbot:
             categories = ["GENERAL"]
         primary_category = categories[0]
 
-        # mapped_category가 더 우선도가 높으면 사용
-        # 단, 의도 분류 신뢰도가 임계값(0.3) 이상인 경우에만 적용
-        # 신뢰도가 낙으면 기존 키워드 기반 분류를 유지하여 오매칭을 방지
+        # 의도 분류기는 키워드 분류기가 GENERAL로 떨어진 경우에만 보정 신호로
+        # 사용한다. 키워드 분류기가 이미 구체적인 카테고리를 반환했을 때
+        # 의도 분류기로 덮어쓰면 미세한 도메인 단어(예: "반입") 한 개로
+        # IMPORT_EXPORT 등으로 잘못 라우팅되는 사례가 발생한다.
         INTENT_CONFIDENCE_THRESHOLD = 0.3
-        if mapped_category != "GENERAL" and intent_confidence >= INTENT_CONFIDENCE_THRESHOLD:
+        if (
+            primary_category == "GENERAL"
+            and mapped_category != "GENERAL"
+            and intent_confidence >= INTENT_CONFIDENCE_THRESHOLD
+        ):
             primary_category = mapped_category
 
         # 5단계: FAQ 매칭
@@ -495,10 +534,24 @@ class BondedExhibitionChatbot:
                     risk_level, policy_decision, escalation_triggered,
                 )
 
-            # 법령 가이드 요약 추출 (지식 그래프 연계)
-            legal_guide = []
+            # 법령 가이드 요약 추출.
+            # 1) 국가법령정보센터 캐시(LawCacheBridge)에 저장된 최신 본문이 있으면
+            #    "{조문} (YYYY-MM-DD 동기화 기준): {요약}" 형태로 우선 노출한다.
+            # 2) 캐시가 비어있는 항목은 정적 지식 그래프 요약으로 폴백한다.
+            legal_basis_list = faq_match.get("legal_basis", [])
+            legal_guide: list[str] = []
+            covered_by_cache: set[str] = set()
+            if self.law_cache:
+                cache_entries = self.law_cache.build_legal_guide_entries(legal_basis_list)
+                legal_guide.extend(cache_entries)
+                # cache_entries는 "{basis} (...)" 형태이므로 prefix로 매칭한다.
+                for basis in legal_basis_list:
+                    if any(entry.startswith(basis) for entry in cache_entries):
+                        covered_by_cache.add(basis)
             if self.knowledge_graph:
-                for basis in faq_match.get("legal_basis", []):
+                for basis in legal_basis_list:
+                    if basis in covered_by_cache:
+                        continue
                     law_node_id = f"law_{basis}"
                     if law_node_id in self.knowledge_graph.nodes:
                         node_data = self.knowledge_graph.nodes[law_node_id].get("data", {})
@@ -654,7 +707,6 @@ class BondedExhibitionChatbot:
 
     def _build_escalation_response_from_policy(self, policy_decision: dict) -> str:
         """정책 평가 결과로부터 에스컬레이션 응답을 생성한다."""
-        escalation_target = policy_decision.get("escalation_target")
         risk_level = policy_decision.get("risk_level", "high")
         disclaimers = policy_decision.get("disclaimers", [])
 

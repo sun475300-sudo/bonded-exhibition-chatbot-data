@@ -2,10 +2,13 @@
 
 import pytest
 
-# VectorSearchEngine은 sentence-transformers가 설치되었을 때만 테스트
+# VectorSearchEngine은 sentence-transformers가 설치되었을 때만 테스트.
+# 모듈 import 자체는 성공하지만 numpy/sentence-transformers가 없으면
+# `vector_search.HAS_EMBEDDINGS`가 False 이므로 그 값을 직접 확인한다.
 try:
     from src.vector_search import VectorSearchEngine
-    HAS_EMBEDDINGS = True
+    from src.vector_search import HAS_EMBEDDINGS as _HAS_EMBEDDINGS
+    HAS_EMBEDDINGS = _HAS_EMBEDDINGS
 except ImportError:
     HAS_EMBEDDINGS = False
 

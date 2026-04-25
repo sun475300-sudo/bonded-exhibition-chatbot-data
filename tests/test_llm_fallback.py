@@ -149,6 +149,17 @@ class TestResponseCache:
         assert cache.get("key1") == "value2"
 
 
+# anthropic SDK가 설치되어 있지 않으면 `src.llm_fallback.anthropic` 속성이
+# 없어서 `patch("src.llm_fallback.anthropic.Anthropic")` 가 AttributeError 를
+# 발생시킨다. CI 환경에는 anthropic 가 설치되어 있지 않으므로 이런 테스트는
+# 모듈이 있을 때만 실행한다.
+anthropic_required = pytest.mark.skipif(
+    pytest.importorskip.__module__ and __import__("importlib").util.find_spec("anthropic") is None,
+    reason="anthropic SDK not installed",
+)
+
+
+@anthropic_required
 class TestLLMFallbackProvider:
     """LLMFallbackProvider 테스트."""
 
