@@ -49,6 +49,12 @@ KEYWORD_SCORE_THRESHOLD = 3
 TFIDF_SCORE_THRESHOLD = 0.1
 CLASSIFIER_CACHE_MAX_SIZE = 100
 MIN_CONCLUSION_LENGTH = 3
+# 다중 토큰(공백 포함) / 5자 이상 키워드는 구체적이므로 가중치를 더 준다.
+MULTI_TOKEN_KEYWORD_BONUS = 2
+LONG_KEYWORD_THRESHOLD = 5
+LONG_KEYWORD_BONUS = 1
+# 질문 텍스트와 쿼리의 단어 단위 겹침 점수 가중치
+QUESTION_OVERLAP_WEIGHT = 0.5
 
 
 class BondedExhibitionChatbot:
@@ -219,20 +225,21 @@ class BondedExhibitionChatbot:
         """질문과 카테고리에 매칭되는 FAQ 항목을 찾는다.
 
         파이프라인:
-        1. 키워드 매칭
+        1. 키워드 매칭 (길이/구체성 가중치 포함)
         2. TF-IDF 유사도
         3. BM25 랭킹
         4. 벡터 검색 (의미론적 매칭)
         5. LLM 폴백 (마지막 수단)
         """
         query_lower = normalize_query(query)
+        query_tokens = set(t for t in query_lower.split() if len(t) >= 2)
         best_match = None
-        best_score = 0
+        best_score = 0.0
         best_keyword_hits = 0
 
-        # 1단계: 키워드 매칭
+        # 1단계: 키워드 매칭 (구체성 가중치 + 질문 겹침 보너스)
         for item in self.faq_items:
-            score = 0
+            score = 0.0
             keyword_hits = 0
 
             if item.get("category") == category:
@@ -240,9 +247,25 @@ class BondedExhibitionChatbot:
 
             keywords = item.get("keywords", [])
             for kw in keywords:
-                if kw.lower() in query_lower:
-                    score += 1
-                    keyword_hits += 1
+                kw_lower = kw.lower()
+                if not kw_lower or kw_lower not in query_lower:
+                    continue
+                # 기본 1점 + 다중 토큰(2점) + 5자 이상(1점) → 더 구체적인 키워드일수록 높은 가중치
+                kw_score = 1
+                if " " in kw_lower:
+                    kw_score += MULTI_TOKEN_KEYWORD_BONUS
+                if len(kw_lower) >= LONG_KEYWORD_THRESHOLD:
+                    kw_score += LONG_KEYWORD_BONUS
+                score += kw_score
+                keyword_hits += 1
+
+            # 질문 텍스트와 쿼리의 단어 겹침 보너스 (오답 분리용)
+            faq_question = (item.get("question") or "").lower()
+            if faq_question and query_tokens:
+                faq_tokens = set(t for t in faq_question.split() if len(t) >= 2)
+                overlap = len(query_tokens & faq_tokens)
+                if overlap:
+                    score += overlap * QUESTION_OVERLAP_WEIGHT
 
             if score > best_score or (score == best_score and keyword_hits > best_keyword_hits):
                 best_score = score
