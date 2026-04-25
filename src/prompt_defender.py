@@ -1,6 +1,6 @@
 """Prompt Injection Defender 모듈 (Phase 63).
 
-사용자의 입력에서 SQL 인젝션, XSS(크로스 사이트 스크립팅), 
+사용자의 입력에서 SQL 인젝션, XSS(크로스 사이트 스크립팅),
 또는 LLM 시스템 프롬프트를 탈취하려는 시도를 감지하여 차단합니다.
 """
 from __future__ import annotations
