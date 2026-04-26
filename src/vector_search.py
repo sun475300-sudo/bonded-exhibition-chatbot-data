@@ -9,12 +9,11 @@ import hashlib
 import os
 from functools import lru_cache
 
+import numpy as np
 try:
-    import numpy as np
     from sentence_transformers import SentenceTransformer
     HAS_EMBEDDINGS = True
 except ImportError:
-    np = None  # type: ignore
     SentenceTransformer = None
     HAS_EMBEDDINGS = False
 
@@ -22,9 +21,13 @@ except ImportError:
 class DummyModel:
     """sentence-transformers가 없을 때 사용하는 더미 모델."""
     def encode(self, sentences, **kwargs):
+        convert_to_numpy = kwargs.get('convert_to_numpy', False)
         if isinstance(sentences, str):
-            return [0.0] * 384
-        return [[0.0] * 384 for _ in range(len(sentences))]
+            res = [0.0] * 384
+            return np.array(res) if convert_to_numpy else res
+        
+        res = [[0.0] * 384 for _ in range(len(sentences))]
+        return np.array(res) if convert_to_numpy else res
 
 
 class VectorSearchEngine:
