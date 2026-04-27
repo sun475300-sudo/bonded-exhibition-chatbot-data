@@ -24,7 +24,7 @@ class DummyModel:
         if isinstance(sentences, str):
             res = [0.0] * 384
             return np.array(res) if convert_to_numpy else res
-        
+
         res = [[0.0] * 384 for _ in range(len(sentences))]
         return np.array(res) if convert_to_numpy else res
 
