@@ -283,9 +283,9 @@ class TestLLMFallbackProvider:
                 mock_client = MagicMock()
                 mock_anthropic.return_value = mock_client
 
-                # API 오류 발생
+                # API 오류 발생 — anthropic 0.30+ APIError 시그니처는 (message, request)
                 mock_client.messages.create.side_effect = anthropic.APIError(
-                    "API Error", request=None, response=None
+                    "API Error", request=None, body=None
                 )
 
                 provider = LLMFallbackProvider()
