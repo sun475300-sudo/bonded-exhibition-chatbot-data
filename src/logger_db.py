@@ -134,3 +134,50 @@ class ChatLogger:
         if hasattr(self._local, "conn") and self._local.conn:
             self._local.conn.close()
             self._local.conn = None
+
+    def rotate(self, retention_days: int = 90, vacuum: bool = True) -> dict:
+        """L1: 오래된 로그 삭제 + DB vacuum.
+
+        chat_logs 테이블에서 retention_days 보다 오래된 행 삭제 + WAL checkpoint
+        + (선택) VACUUM. 운영 시 정기 cron으로 호출 (RUNBOOK 참조).
+
+        Args:
+            retention_days: 보존 기간(일). 기본 90일.
+            vacuum: VACUUM 실행 여부. WAL checkpoint는 항상 수행.
+
+        Returns:
+            dict: {"deleted": int, "before_size_bytes": int, "after_size_bytes": int}
+        """
+        from datetime import timedelta
+
+        conn = self._get_conn()
+        cutoff = (datetime.now() - timedelta(days=retention_days)).strftime("%Y-%m-%d %H:%M:%S")
+
+        before_size = os.path.getsize(self.db_path) if os.path.exists(self.db_path) else 0
+
+        cursor = conn.execute(
+            "DELETE FROM chat_logs WHERE timestamp < ?", (cutoff,)
+        )
+        deleted = cursor.rowcount
+        conn.commit()
+
+        # WAL checkpoint (TRUNCATE: WAL 파일도 비움)
+        try:
+            conn.execute("PRAGMA wal_checkpoint(TRUNCATE)")
+        except sqlite3.Error:
+            pass
+
+        if vacuum:
+            try:
+                conn.execute("VACUUM")
+            except sqlite3.Error:
+                pass
+
+        after_size = os.path.getsize(self.db_path) if os.path.exists(self.db_path) else 0
+
+        return {
+            "deleted": deleted,
+            "before_size_bytes": before_size,
+            "after_size_bytes": after_size,
+            "cutoff": cutoff,
+        }
