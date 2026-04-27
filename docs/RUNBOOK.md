@@ -157,8 +157,8 @@ WAL 모드 적용 후 거의 발생 안 하지만:
 | `CHATBOT_LOG_LEVEL` | — | `INFO` | 로그 레벨 |
 | `CHATBOT_DB_PATH` | — | `logs/chat_logs.db` | SQLite 경로 |
 | `CHATBOT_API_KEYS` | — | (none) | API 인증 (콤마 구분, 비우면 인증 비활성) |
-| `CHATBOT_CORS_ORIGINS` | — | `*` | CORS 허용 (운영에선 도메인 명시) |
-| `JWT_SECRET` | **운영** | (none) | 관리자 인증 — `secrets.token_urlsafe(64)` 권장 |
+| `CHATBOT_CORS_ORIGINS` | **운영** | `localhost:5000,localhost:8080,localhost:3000` | CORS 허용. 운영에선 `https://chatbot.example.com,https://admin.example.com` 식으로 도메인 명시. `*`는 dev에서만 |
+| `JWT_SECRET_KEY` (`JWT_SECRET` 호환) | **운영** | compiled default `bonded-exhibition-chatbot-secret-key` (위조 가능) | 관리자 인증. `python -c "import secrets;print(secrets.token_urlsafe(64))"` 권장. `FLASK_ENV=production`에서 미설정 시 WARNING 로그 |
 | `ADMIN_USERS` | **운영** | (none) | 관리자 계정 JSON `[{"username":"…","password":"…"}]` |
 | `SLACK_WEBHOOK_URL` | — | (none) | 알림 대상 |
 | `ANTHROPIC_API_KEY` | LLM | (none) | LLM fallback 활성화 |
