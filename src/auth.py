@@ -79,9 +79,31 @@ def _get_admin_users() -> list:
     return _DEFAULT_ADMIN_USERS
 
 
+_DEFAULT_JWT_SECRET = "bonded-exhibition-chatbot-secret-key"  # noqa: S105
+
+
 def _get_secret_key() -> str:
-    """Get the JWT secret key from env or generate a default."""
-    return os.environ.get("JWT_SECRET_KEY", "bonded-exhibition-chatbot-secret-key")
+    """Get the JWT secret key from env (JWT_SECRET_KEY 또는 JWT_SECRET) 또는 기본값.
+
+    .env.example은 `JWT_SECRET`을 안내하나 기존 코드는 `JWT_SECRET_KEY` 만 읽었음.
+    이 불일치로 사용자가 `.env`에 JWT_SECRET 설정해도 fallback이 적용되던 결함.
+    이제 양쪽 다 지원, JWT_SECRET_KEY 우선.
+
+    운영 환경(FLASK_ENV=production 또는 ENV=production)에서 기본값 사용 시 WARNING.
+    """
+    secret = os.environ.get("JWT_SECRET_KEY") or os.environ.get("JWT_SECRET")
+    if not secret:
+        env = os.environ.get("FLASK_ENV") or os.environ.get("ENV") or ""
+        if env.lower() == "production":
+            import logging as _logging
+            _logging.getLogger(__name__).warning(
+                "JWT_SECRET_KEY (or JWT_SECRET) not set in production. "
+                "Using compiled default — JWT 토큰 위조 가능. "
+                "즉시 안전한 값으로 설정하세요: "
+                'python -c "import secrets;print(secrets.token_urlsafe(64))"'
+            )
+        return _DEFAULT_JWT_SECRET
+    return secret
 
 
 class JWTAuth:
