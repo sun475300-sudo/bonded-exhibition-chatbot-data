@@ -1160,13 +1160,43 @@ def autocomplete():
 
 @app.route("/api/health", methods=["GET"])
 def health():
-    """Production health check endpoint with version and FAQ count."""
+    """Production health check endpoint with version, FAQ count, and component status.
+
+    F2 보강: db_ok / vector_index_loaded / llm_provider_ok 추가.
+    """
     try:
         faq_count = len(chatbot.faq_items) if hasattr(chatbot, 'faq_items') else 0
+
+        # F2: DB ping
+        db_ok = False
+        try:
+            if hasattr(chatbot, 'logger_db') and chatbot.logger_db is not None:
+                conn = chatbot.logger_db._get_conn()
+                conn.execute("SELECT 1").fetchone()
+                db_ok = True
+            else:
+                db_ok = True  # 로거 미사용 환경
+        except Exception:
+            db_ok = False
+
+        # F2: 벡터 인덱스 lazy load 여부
+        vector_index_loaded = False
+        try:
+            if hasattr(chatbot, 'vector_search') and chatbot.vector_search is not None:
+                vector_index_loaded = bool(getattr(chatbot.vector_search, 'is_model_loaded', lambda: False)())
+        except Exception:
+            vector_index_loaded = False
+
+        # F2: LLM provider 환경변수 / 사용 가능 여부
+        llm_provider_ok = bool(os.environ.get("CHATBOT_LLM_API_KEY") or os.environ.get("ANTHROPIC_API_KEY"))
+
         return jsonify({
             "status": "ok",
             "version": APP_VERSION,
             "faq_count": faq_count,
+            "db_ok": db_ok,
+            "vector_index_loaded": vector_index_loaded,
+            "llm_provider_ok": llm_provider_ok,
             "timestamp": datetime.utcnow().isoformat() + "Z"
         }), 200
     except Exception as e:
