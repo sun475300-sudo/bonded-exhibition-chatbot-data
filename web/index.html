@@ -80,9 +80,11 @@
     backdrop-filter: blur(20px);
     border-right: 1px solid var(--glass-border);
     display: none;
+    min-height: 0;       /* flexbox scroll 핵심 */
+    overflow: hidden;    /* 헤더는 고정, sidebar-content만 스크롤 */
   }
   @media (min-width: 900px) { .sidebar { display: flex; flex-direction: column; } }
-  
+
   .sidebar-header {
     padding: 24px 20px 16px;
     font-size: 12px;
@@ -91,7 +93,27 @@
     text-transform: uppercase;
     letter-spacing: 2px;
     background: rgba(10, 15, 24, 0.4);
+    flex: 0 0 auto;      /* 헤더 고정 */
   }
+
+  /* FAQ 리스트 — 사이드바에서 남은 영역 차지 + 스크롤 */
+  .sidebar-content {
+    flex: 1 1 auto;
+    min-height: 0;       /* flexbox scroll 핵심 */
+    overflow-y: auto;
+    overflow-x: hidden;
+    padding: 8px 12px 24px;
+    scroll-behavior: smooth;
+  }
+  /* 사이드바 스크롤바 가시성 (다크 테마 대비) */
+  .sidebar-content::-webkit-scrollbar { width: 8px; }
+  .sidebar-content::-webkit-scrollbar-track { background: rgba(255,255,255,0.03); }
+  .sidebar-content::-webkit-scrollbar-thumb {
+    background: rgba(255,255,255,0.18);
+    border-radius: 4px;
+  }
+  .sidebar-content::-webkit-scrollbar-thumb:hover { background: rgba(255,255,255,0.30); }
+  .sidebar-content { scrollbar-width: thin; scrollbar-color: rgba(255,255,255,0.18) transparent; }
 
   /* 채팅 영역 — flex column으로 messages가 남은 height 차지 */
   main.chat-area {
