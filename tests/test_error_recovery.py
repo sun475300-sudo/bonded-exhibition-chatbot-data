@@ -9,7 +9,7 @@ import pytest
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-from src.error_recovery import (
+from src.error_recovery import (  # noqa: E402
     CircuitBreaker,
     CircuitBreakerOpenError,
     CircuitState,
@@ -256,8 +256,12 @@ class TestRetry:
 
 class TestFallback:
     def test_fallback_not_used_on_success(self, recovery):
-        primary = lambda: "primary result"
-        fallback = lambda: "fallback result"
+        def primary():
+            return "primary result"
+
+        def fallback():
+            return "fallback result"
+
         wrapped = recovery.with_fallback(primary, fallback)
         assert wrapped() == "primary result"
 
@@ -265,7 +269,9 @@ class TestFallback:
         def primary():
             raise ValueError("primary fails")
 
-        fallback = lambda: "fallback result"
+        def fallback():
+            return "fallback result"
+
         wrapped = recovery.with_fallback(primary, fallback)
         assert wrapped() == "fallback result"
 

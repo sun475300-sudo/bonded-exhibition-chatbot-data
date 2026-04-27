@@ -188,7 +188,9 @@ class ErrorLogger:
         ).fetchall()
         # 엔드포인트별
         by_endpoint = conn.execute(
-            "SELECT endpoint, COUNT(*) as count FROM error_logs WHERE endpoint IS NOT NULL GROUP BY endpoint ORDER BY count DESC"
+            "SELECT endpoint, COUNT(*) as count FROM error_logs "
+            "WHERE endpoint IS NOT NULL "
+            "GROUP BY endpoint ORDER BY count DESC"
         ).fetchall()
         # 최근 1시간
         cutoff_1h = time.time() - 3600
