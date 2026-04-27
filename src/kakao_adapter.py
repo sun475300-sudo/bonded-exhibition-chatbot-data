@@ -153,7 +153,7 @@ def format_escalation_card(escalation_info: dict) -> dict:
     if phone:
         buttons.append({
             "action": "phone",
-            "label": f"전화 연결",
+            "label": "전화 연결",
             "phoneNumber": phone,
         })
     if url:

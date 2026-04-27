@@ -40,7 +40,6 @@ def pytest_runtest_setup(item):
 
 def pytest_runtest_teardown(item, nextitem):
     """Restore faq.json after every test to prevent pollution."""
-    global _faq_backup_content
     if _faq_backup_content is not None:
         with open(FAQ_PATH, "r", encoding="utf-8") as f:
             current = f.read()

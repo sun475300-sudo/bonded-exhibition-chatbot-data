@@ -15,7 +15,6 @@ from __future__ import annotations
 
 import logging
 import os
-from typing import Optional
 
 from src.bm25_ranker import BM25Ranker
 from src.variant_matcher import VariantMatcher
