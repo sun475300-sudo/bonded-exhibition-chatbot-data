@@ -53,7 +53,9 @@ class VectorSearchEngine:
         """
         self.faq_items = faq_items
         self._model = None  # lazy
-        self.embeddings = None  # lazy (첫 검색 호출 시 _precompute_embeddings)
+        # E1 lazy: 비어있는 FAQ는 모델 로드 없이도 즉시 빈 array 보장
+        # (검색 호출 없이도 engine.embeddings 검사 가능)
+        self.embeddings = np.array([]) if not faq_items else None
         self.embedding_cache = {}  # 동일 질문 재인코딩 방지
 
     @property
