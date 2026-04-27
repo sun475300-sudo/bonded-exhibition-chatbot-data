@@ -29,6 +29,14 @@ backups/
 # Reports
 reports/*.json
 
+# Runtime logs (D2: SQLite WAL/journal + 일별 정책 jsonl 누적)
+logs/*.db
+logs/*.db-shm
+logs/*.db-wal
+logs/*.db-journal
+logs/policy/*.jsonl
+!logs/.gitkeep
+
 # IDE
 .idea/
 .vscode/
