@@ -19,10 +19,18 @@ class ChatLogger:
         self._init_table()
 
     def _get_conn(self):
-        """스레드별 SQLite 연결을 반환한다."""
+        """스레드별 SQLite 연결을 반환한다.
+
+        F3: WAL 모드 활성화 — 동시 읽기/쓰기 처리량 향상 + 크래시 복원성.
+        """
         if not hasattr(self._local, "conn") or self._local.conn is None:
             self._local.conn = sqlite3.connect(self.db_path)
             self._local.conn.row_factory = sqlite3.Row
+            try:
+                self._local.conn.execute("PRAGMA journal_mode=WAL")
+                self._local.conn.execute("PRAGMA synchronous=NORMAL")
+            except sqlite3.Error:
+                pass  # 일부 환경(read-only DB 등)에서 PRAGMA 실패 허용
         return self._local.conn
 
     def _init_table(self):

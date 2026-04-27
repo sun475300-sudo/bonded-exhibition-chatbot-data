@@ -40,23 +40,42 @@ class VectorSearchEngine:
     CONFIDENT_THRESHOLD = 0.65  # 높은 신뢰도 매칭
     SUGGESTION_THRESHOLD = 0.45  # "혹시 이것을 찾으셨나요?" 제안
 
+    MODEL_NAME = "sentence-transformers/paraphrase-multilingual-MiniLM-L12-v2"
+
     def __init__(self, faq_items: list[dict]):
         """벡터 검색 엔진을 초기화한다.
+
+        E1 lazy load: SentenceTransformer 로드 + FAQ 임베딩 사전 계산은
+        첫 검색 호출 시점으로 지연 (import-time 8s+ → 첫 query 8s + 이후 <10ms).
 
         Args:
             faq_items: FAQ 항목 리스트. 각 항목에 question, keywords, answer, category 필드 필요.
         """
         self.faq_items = faq_items
-        if HAS_EMBEDDINGS and SentenceTransformer:
-            self.model = SentenceTransformer("sentence-transformers/paraphrase-multilingual-MiniLM-L12-v2")
-        else:
-            self.model = DummyModel()
-
-        self.embeddings = None
+        self._model = None  # lazy
+        # E1 lazy: 비어있는 FAQ는 모델 로드 없이도 즉시 빈 array 보장
+        # (검색 호출 없이도 engine.embeddings 검사 가능)
+        self.embeddings = np.array([]) if not faq_items else None
         self.embedding_cache = {}  # 동일 질문 재인코딩 방지
 
-        # FAQ 임베딩 사전 계산
-        self._precompute_embeddings()
+    @property
+    def model(self):
+        """E1 lazy: SentenceTransformer 모델을 첫 접근 시 로드."""
+        if self._model is None:
+            if HAS_EMBEDDINGS and SentenceTransformer:
+                self._model = SentenceTransformer(self.MODEL_NAME)
+            else:
+                self._model = DummyModel()
+        return self._model
+
+    def _ensure_embeddings(self) -> None:
+        """E1 lazy: 첫 검색 호출 시점에 FAQ 임베딩 1회 계산."""
+        if self.embeddings is None:
+            self._precompute_embeddings()
+
+    def is_model_loaded(self) -> bool:
+        """E1: 모델이 이미 lazy load 됐는지 확인 (헬스체크용)."""
+        return self._model is not None
 
     def _precompute_embeddings(self) -> None:
         """모든 FAQ 항목의 임베딩을 사전 계산한다."""
@@ -164,6 +183,9 @@ class VectorSearchEngine:
         if not query or not query.strip():
             return []
 
+        # E1 lazy: 첫 검색 시 임베딩 계산
+        self._ensure_embeddings()
+
         if self.embeddings is None or len(self.embeddings) == 0:
             return []
 
@@ -206,6 +228,9 @@ class VectorSearchEngine:
         """
         if not query or not query.strip():
             return []
+
+        # E1 lazy: 첫 검색 시 임베딩 계산
+        self._ensure_embeddings()
 
         if self.embeddings is None or len(self.embeddings) == 0:
             return []
@@ -263,5 +288,7 @@ class VectorSearchEngine:
         return {
             "cached_queries": len(self.embedding_cache),
             "max_cache_size": 1000,
-            "model": "sentence-transformers/paraphrase-multilingual-MiniLM-L12-v2" if HAS_EMBEDDINGS else "dummy-zeros"
+            "model": self.MODEL_NAME if HAS_EMBEDDINGS else "dummy-zeros",
+            "model_loaded": self.is_model_loaded(),
+            "embeddings_computed": self.embeddings is not None,
         }

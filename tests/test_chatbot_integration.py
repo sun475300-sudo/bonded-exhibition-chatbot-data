@@ -246,7 +246,11 @@ class TestChatbotIntegration:
 
     @pytest.mark.skipif(not HAS_EMBEDDINGS, reason="sentence-transformers not installed")
     def test_chatbot_vector_search_performance(self):
-        """벡터 검색 성능 테스트."""
+        """벡터 검색 성능 테스트.
+
+        E1 lazy load: 첫 검색 호출이 모델 로드(~3-4s) 포함하므로
+        warmup 1회로 lazy 트리거 후 10회 hot path 측정.
+        """
         import time
         from src.chatbot import BondedExhibitionChatbot
 
@@ -255,13 +259,16 @@ class TestChatbotIntegration:
         if not chatbot.vector_search_enabled:
             pytest.skip("Vector search not enabled")
 
-        # 성능 측정
+        # Warmup: lazy load 트리거 (모델 + 임베딩 사전 계산)
+        chatbot.vector_search.find_best_match("warmup", top_k=1)
+
+        # 성능 측정 (hot path)
         start = time.time()
         for _ in range(10):
             chatbot.vector_search.find_best_match("보세전시장 반입", top_k=3)
         elapsed = time.time() - start
 
-        # 10회 검색이 1초 이내
+        # 10회 검색이 1초 이내 (warmup 후)
         assert elapsed < 1.0, f"Vector search too slow: {elapsed}s"
 
     def test_chatbot_category_handling(self):
