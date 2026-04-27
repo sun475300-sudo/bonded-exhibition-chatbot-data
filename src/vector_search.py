@@ -6,7 +6,6 @@ FAQ 항목의 임베딩을 사전 계산하고, 사용자 질문의 코사인 �
 from __future__ import annotations
 
 import hashlib
-import os
 from functools import lru_cache
 
 import numpy as np
@@ -25,7 +24,7 @@ class DummyModel:
         if isinstance(sentences, str):
             res = [0.0] * 384
             return np.array(res) if convert_to_numpy else res
-        
+
         res = [[0.0] * 384 for _ in range(len(sentences))]
         return np.array(res) if convert_to_numpy else res
 
@@ -52,7 +51,7 @@ class VectorSearchEngine:
             self.model = SentenceTransformer("sentence-transformers/paraphrase-multilingual-MiniLM-L12-v2")
         else:
             self.model = DummyModel()
-            
+
         self.embeddings = None
         self.embedding_cache = {}  # 동일 질문 재인코딩 방지
 

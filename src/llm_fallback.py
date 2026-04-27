@@ -14,7 +14,6 @@ import os
 import sys
 import time
 from collections import OrderedDict
-from datetime import datetime, timedelta
 
 try:
     import anthropic
@@ -23,18 +22,18 @@ except ImportError:
     # 테스트 환경에서 sys.modules를 통해 anthropic 모듈을 가짜로 생성
     from types import ModuleType
     mock_anthropic = ModuleType("anthropic")
-    
+
     class MockAnthropicClient:
         pass
-        
+
     class MockAPIError(Exception):
         def __init__(self, *args, **kwargs):
             super().__init__(*args)
-            
+
     mock_anthropic.Anthropic = MockAnthropicClient
     mock_anthropic.APIError = MockAPIError
     sys.modules["anthropic"] = mock_anthropic
-    
+
     anthropic = mock_anthropic
     HAS_ANTHROPIC = False
 
@@ -219,7 +218,7 @@ class LLMFallbackProvider:
                     legal_basis.extend(bases)
 
             if legal_basis:
-                prompt += f"\n법적 근거:\n"
+                prompt += "\n법적 근거:\n"
                 for basis in legal_basis[:5]:  # 최대 5개
                     prompt += f"- {basis}\n"
 
@@ -283,7 +282,7 @@ class LLMFallbackProvider:
 
             return response
 
-        except anthropic.APIError as e:
+        except anthropic.APIError:
             # API 오류는 로깅하고 None 반환
             return None
         except Exception:

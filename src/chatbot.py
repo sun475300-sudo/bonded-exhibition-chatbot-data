@@ -654,7 +654,7 @@ class BondedExhibitionChatbot:
 
     def _build_escalation_response_from_policy(self, policy_decision: dict) -> str:
         """정책 평가 결과로부터 에스컬레이션 응답을 생성한다."""
-        escalation_target = policy_decision.get("escalation_target")
+        policy_decision.get("escalation_target")
         risk_level = policy_decision.get("risk_level", "high")
         disclaimers = policy_decision.get("disclaimers", [])
 
