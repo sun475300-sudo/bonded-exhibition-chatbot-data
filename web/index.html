@@ -93,13 +93,38 @@
     background: rgba(10, 15, 24, 0.4);
   }
 
+  /* 채팅 영역 — flex column으로 messages가 남은 height 차지 */
+  main.chat-area {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    min-width: 0;
+    min-height: 0;
+    overflow: hidden;
+  }
+
   /* 채팅 애니메이션 */
   .messages {
-    flex: 1;
+    flex: 1 1 auto;
+    min-height: 0; /* flexbox scroll 핵심: 자식이 부모를 못 늘리도록 */
     overflow-y: auto;
+    overflow-x: hidden;
     padding: 32px;
     scroll-behavior: smooth;
+    display: flex;
+    flex-direction: column;
   }
+  /* 스크롤바 가시성 보강 (Webkit + Firefox) */
+  .messages::-webkit-scrollbar { width: 10px; }
+  .messages::-webkit-scrollbar-track { background: rgba(255,255,255,0.03); }
+  .messages::-webkit-scrollbar-thumb {
+    background: rgba(255,255,255,0.15);
+    border-radius: 5px;
+    border: 2px solid transparent;
+    background-clip: padding-box;
+  }
+  .messages::-webkit-scrollbar-thumb:hover { background: rgba(255,255,255,0.25); background-clip: padding-box; }
+  .messages { scrollbar-width: thin; scrollbar-color: rgba(255,255,255,0.15) transparent; }
   .msg {
     max-width: 80%;
     padding: 20px 28px;
