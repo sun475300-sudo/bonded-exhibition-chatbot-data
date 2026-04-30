@@ -18,3 +18,9 @@ def test_llm_fallback_availability():
     from src.llm_fallback import is_llm_available
     # API 키가 없으므로 기본적으로 False여야 함
     assert is_llm_available() is False
+
+def test_ip_address_redaction():
+    redactor = PIIRedactor(enabled=True)
+    # IPv4 주소 테스트
+    assert "[REDACTED_IP]" in redactor.redact("서버 접속 IP는 192.168.0.1 입니다.")
+    assert "[REDACTED_IP]" in redactor.redact("공인 IP 1.2.3.4 확인 바랍니다.")
