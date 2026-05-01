@@ -24,3 +24,9 @@ def test_ip_address_redaction():
     # IPv4 주소 테스트
     assert "[REDACTED_IP]" in redactor.redact("서버 접속 IP는 192.168.0.1 입니다.")
     assert "[REDACTED_IP]" in redactor.redact("공인 IP 1.2.3.4 확인 바랍니다.")
+
+def test_url_redaction():
+    redactor = PIIRedactor(enabled=True)
+    # URL 테스트
+    assert "[REDACTED_URL]" in redactor.redact("자세한 내용은 https://example.com/sensitive-data 를 참고하세요.")
+    assert "[REDACTED_URL]" in redactor.redact("공식 홈페이지는 http://www.test.co.kr 입니다.")
