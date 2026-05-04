@@ -9,7 +9,6 @@ import os
 import re
 import sqlite3
 import threading
-import time
 from datetime import datetime
 
 BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))

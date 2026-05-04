@@ -989,3 +989,4 @@ python web_server.py --port 8080
 - **FAQ 데이터 보강**: `faq.json`의 반입 기한 및 ATA 까르네 관련 항목에 실무 키워드를 20여 개 추가했습니다.
 - **실시간 리로드 지원**: 서버 재시작 없이 FAQ를 업데이트할 수 있는 `/api/faq/reload` API를 신규 구축했습니다.
 - **보안 강화**: PII(개인정보) 마스킹 기능 및 프롬프트 인젝션 차단 정책을 실데이터로 검증 완료했습니다.
+# Daily improvement for bosebot - 2026-04-28

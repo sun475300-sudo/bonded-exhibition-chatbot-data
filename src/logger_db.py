@@ -19,10 +19,18 @@ class ChatLogger:
         self._init_table()
 
     def _get_conn(self):
-        """스레드별 SQLite 연결을 반환한다."""
+        """스레드별 SQLite 연결을 반환한다.
+
+        F3: WAL 모드 활성화 — 동시 읽기/쓰기 처리량 향상 + 크래시 복원성.
+        """
         if not hasattr(self._local, "conn") or self._local.conn is None:
             self._local.conn = sqlite3.connect(self.db_path)
             self._local.conn.row_factory = sqlite3.Row
+            try:
+                self._local.conn.execute("PRAGMA journal_mode=WAL")
+                self._local.conn.execute("PRAGMA synchronous=NORMAL")
+            except sqlite3.Error:
+                pass  # 일부 환경(read-only DB 등)에서 PRAGMA 실패 허용
         return self._local.conn
 
     def _init_table(self):
@@ -126,3 +134,50 @@ class ChatLogger:
         if hasattr(self._local, "conn") and self._local.conn:
             self._local.conn.close()
             self._local.conn = None
+
+    def rotate(self, retention_days: int = 90, vacuum: bool = True) -> dict:
+        """L1: 오래된 로그 삭제 + DB vacuum.
+
+        chat_logs 테이블에서 retention_days 보다 오래된 행 삭제 + WAL checkpoint
+        + (선택) VACUUM. 운영 시 정기 cron으로 호출 (RUNBOOK 참조).
+
+        Args:
+            retention_days: 보존 기간(일). 기본 90일.
+            vacuum: VACUUM 실행 여부. WAL checkpoint는 항상 수행.
+
+        Returns:
+            dict: {"deleted": int, "before_size_bytes": int, "after_size_bytes": int}
+        """
+        from datetime import timedelta
+
+        conn = self._get_conn()
+        cutoff = (datetime.now() - timedelta(days=retention_days)).strftime("%Y-%m-%d %H:%M:%S")
+
+        before_size = os.path.getsize(self.db_path) if os.path.exists(self.db_path) else 0
+
+        cursor = conn.execute(
+            "DELETE FROM chat_logs WHERE timestamp < ?", (cutoff,)
+        )
+        deleted = cursor.rowcount
+        conn.commit()
+
+        # WAL checkpoint (TRUNCATE: WAL 파일도 비움)
+        try:
+            conn.execute("PRAGMA wal_checkpoint(TRUNCATE)")
+        except sqlite3.Error:
+            pass
+
+        if vacuum:
+            try:
+                conn.execute("VACUUM")
+            except sqlite3.Error:
+                pass
+
+        after_size = os.path.getsize(self.db_path) if os.path.exists(self.db_path) else 0
+
+        return {
+            "deleted": deleted,
+            "before_size_bytes": before_size,
+            "after_size_bytes": after_size,
+            "cutoff": cutoff,
+        }

@@ -677,7 +677,7 @@ class PolicyEngine:
         }
 
         rule_counts = {}
-        start_date = (datetime.utcnow() - timedelta(days=days)).strftime("%Y-%m-%d")
+        (datetime.utcnow() - timedelta(days=days)).strftime("%Y-%m-%d")
 
         try:
             for log_file in self.audit_log_dir.glob("policy_*.jsonl"):

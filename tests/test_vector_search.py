@@ -46,12 +46,23 @@ class TestVectorSearchEngine:
     """VectorSearchEngine 테스트."""
 
     def test_initialization(self, sample_faq_items):
-        """VectorSearchEngine 초기화 테스트."""
+        """VectorSearchEngine 초기화 테스트.
+
+        E1 lazy load: 비어있는 FAQ는 즉시 빈 array, 그 외엔 첫 검색 호출 후 계산.
+        모델은 항상 lazy (첫 모델 접근/검색 호출 시 로드).
+        """
         engine = VectorSearchEngine(sample_faq_items)
 
         assert engine.faq_items == sample_faq_items
+        # E1 lazy: 비어있지 않은 FAQ는 init 시점엔 미계산
+        assert engine.embeddings is None
+        assert engine.is_model_loaded() is False
+
+        # 첫 검색 호출 후 계산됨
+        engine.find_best_match("test", top_k=1)
         assert engine.embeddings is not None
         assert len(engine.embeddings) == len(sample_faq_items)
+        assert engine.is_model_loaded() is True
 
     def test_find_best_match(self, sample_faq_items):
         """최적 매칭 찾기 테스트."""

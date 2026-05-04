@@ -8,7 +8,50 @@ import pytest
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-from src.auth import JWTAuth, hash_password, verify_password, authenticate_user
+from src.auth import (  # noqa: E402
+    JWTAuth,
+    hash_password,
+    verify_password,
+    authenticate_user,
+    _get_secret_key,
+    _DEFAULT_JWT_SECRET,
+)
+
+
+class TestJWTSecretResolution:
+    """JWT_SECRET ↔ JWT_SECRET_KEY 양쪽 지원 + production warning 검증."""
+
+    def _clear(self, monkeypatch):
+        for k in ("JWT_SECRET", "JWT_SECRET_KEY", "FLASK_ENV", "ENV"):
+            monkeypatch.delenv(k, raising=False)
+
+    def test_default_when_unset(self, monkeypatch):
+        self._clear(monkeypatch)
+        assert _get_secret_key() == _DEFAULT_JWT_SECRET
+
+    def test_jwt_secret_legacy_envvar(self, monkeypatch):
+        """`.env.example`이 안내한 JWT_SECRET이 적용되는지 (이전엔 무시되던 결함)."""
+        self._clear(monkeypatch)
+        monkeypatch.setenv("JWT_SECRET", "legacy-secret-value")
+        assert _get_secret_key() == "legacy-secret-value"
+
+    def test_jwt_secret_key_takes_priority(self, monkeypatch):
+        """둘 다 set일 때 JWT_SECRET_KEY 우선."""
+        self._clear(monkeypatch)
+        monkeypatch.setenv("JWT_SECRET", "legacy")
+        monkeypatch.setenv("JWT_SECRET_KEY", "preferred")
+        assert _get_secret_key() == "preferred"
+
+    def test_production_warning_when_default(self, monkeypatch, caplog):
+        """FLASK_ENV=production + 미설정 시 WARNING 로그 + default 반환."""
+        import logging
+        self._clear(monkeypatch)
+        monkeypatch.setenv("FLASK_ENV", "production")
+        with caplog.at_level(logging.WARNING, logger="src.auth"):
+            val = _get_secret_key()
+        assert val == _DEFAULT_JWT_SECRET
+        assert any("JWT_SECRET" in r.message and "production" in r.message
+                   for r in caplog.records)
 
 
 class TestPasswordHashing:
