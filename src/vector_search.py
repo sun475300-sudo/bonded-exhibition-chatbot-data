@@ -135,13 +135,20 @@ class VectorSearchEngine:
         if vec1 is None or vec2 is None:
             return 0.0
 
-        norm1 = np.linalg.norm(vec1)
-        norm2 = np.linalg.norm(vec2)
+        if np is not None:
+            norm1 = np.linalg.norm(vec1)
+            norm2 = np.linalg.norm(vec2)
+            if norm1 == 0.0 or norm2 == 0.0:
+                return 0.0
+            return float(np.dot(vec1, vec2) / (norm1 * norm2))
 
+        # numpy 없을 때 순수 Python
+        dot = sum(a * b for a, b in zip(vec1, vec2))
+        norm1 = sum(a * a for a in vec1) ** 0.5
+        norm2 = sum(b * b for b in vec2) ** 0.5
         if norm1 == 0.0 or norm2 == 0.0:
             return 0.0
-
-        return float(np.dot(vec1, vec2) / (norm1 * norm2))
+        return dot / (norm1 * norm2)
 
     def find_best_match(
         self,
