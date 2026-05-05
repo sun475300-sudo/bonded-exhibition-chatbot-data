@@ -45,7 +45,7 @@ logger = logging.getLogger(__name__)
 # 카테고리 보너스 및 매칭 임계값 설정
 CATEGORY_BONUS = 2
 MIN_KEYWORD_HITS = 1
-KEYWORD_SCORE_THRESHOLD = 3
+KEYWORD_SCORE_THRESHOLD = 1
 TFIDF_SCORE_THRESHOLD = 0.1
 CLASSIFIER_CACHE_MAX_SIZE = 100
 MIN_CONCLUSION_LENGTH = 3
@@ -169,12 +169,20 @@ class BondedExhibitionChatbot:
         best_score = 0
         best_keyword_hits = 0
 
+        # 0단계: 일상 대화(Small Talk) 처리
+        small_talk_keywords = ["안녕", "안녕하세요", "누구", "도와줘"]
+        if any(kw in query_lower for kw in small_talk_keywords):
+            for item in self.faq_items:
+                if item.get("id") == "D":  # 안녕하세요 항목
+                    return item
+
         # 1단계: 키워드 매칭
         for item in self.faq_items:
             score = 0
             keyword_hits = 0
 
-            if item.get("category") == category:
+            # 카테고리가 일치하면 가산점
+            if category and item.get("category") == category:
                 score += CATEGORY_BONUS
 
             keywords = item.get("keywords", [])
@@ -188,7 +196,8 @@ class BondedExhibitionChatbot:
                 best_match = item
                 best_keyword_hits = keyword_hits
 
-        if best_score >= KEYWORD_SCORE_THRESHOLD and best_keyword_hits >= MIN_KEYWORD_HITS:
+        # 임계값 완화: 키워드가 하나라도 일치하면 매칭 시도
+        if best_match and best_keyword_hits >= MIN_KEYWORD_HITS:
             return best_match
 
         # 2단계: TF-IDF 유사도 폴백
