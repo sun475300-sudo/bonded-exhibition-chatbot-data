@@ -8,11 +8,12 @@ from __future__ import annotations
 import hashlib
 from functools import lru_cache
 
-import numpy as np
 try:
+    import numpy as np
     from sentence_transformers import SentenceTransformer
     HAS_EMBEDDINGS = True
 except ImportError:
+    np = None  # type: ignore
     SentenceTransformer = None
     HAS_EMBEDDINGS = False
 
@@ -20,13 +21,10 @@ except ImportError:
 class DummyModel:
     """sentence-transformers가 없을 때 사용하는 더미 모델."""
     def encode(self, sentences, **kwargs):
-        convert_to_numpy = kwargs.get('convert_to_numpy', False)
         if isinstance(sentences, str):
-            res = [0.0] * 384
-            return np.array(res) if convert_to_numpy else res
+            return [0.0] * 384
 
-        res = [[0.0] * 384 for _ in range(len(sentences))]
-        return np.array(res) if convert_to_numpy else res
+        return [[0.0] * 384 for _ in range(len(sentences))]
 
 
 class VectorSearchEngine:
@@ -55,7 +53,7 @@ class VectorSearchEngine:
         self._model = None  # lazy
         # E1 lazy: 비어있는 FAQ는 모델 로드 없이도 즉시 빈 array 보장
         # (검색 호출 없이도 engine.embeddings 검사 가능)
-        self.embeddings = np.array([]) if not faq_items else None
+        self.embeddings = [] if not faq_items else None
         self.embedding_cache = {}  # 동일 질문 재인코딩 방지
 
     @property
@@ -80,7 +78,7 @@ class VectorSearchEngine:
     def _precompute_embeddings(self) -> None:
         """모든 FAQ 항목의 임베딩을 사전 계산한다."""
         if not self.faq_items:
-            self.embeddings = np.array([])
+            self.embeddings = []
             return
 
         # 각 FAQ 항목의 텍스트 결합 (질문 + 키워드 + 답변 첫 문장)
